@@ -137,6 +137,8 @@ class SFM(object):
 
     def pose(self, i):
         """Return i^th pose."""
+        new_pose = self._poses[i]
+        # return Pose3()
         return self._poses[i]
 
     def point(self, j):
