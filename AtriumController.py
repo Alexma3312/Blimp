@@ -1,4 +1,4 @@
-"""This is the Atrium Controller Generater Function."""
+"""This is the Atrium Controller Generater class."""
 import numpy as np
 import cv2
 

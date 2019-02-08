@@ -592,7 +592,7 @@ if __name__ == '__main__':
       help='Input image height (default: 120).')
   parser.add_argument('--W', type=int, default=160,
       help='Input image width (default:160).')
-  parser.add_argument('--display_scale', type=int, default=2,
+  parser.add_argument('--display_scale', type=int, default=1,
       help='Factor to scale output visualization (default: 2).')
   parser.add_argument('--min_length', type=int, default=2,
       help='Minimum length of point tracks (default: 2).')
@@ -667,6 +667,10 @@ if __name__ == '__main__':
     start1 = time.time()
     pts, desc, heatmap = fe.run(img)
     end1 = time.time()
+    ##modify
+    print_pts = pts
+    print_desc = desc    
+    ##modify
 
     # Add points and descriptors to the tracker.
     tracker.update(pts, desc)
@@ -727,6 +731,13 @@ if __name__ == '__main__':
     if opt.show_extra:
       print('Processed image %d (net+post_process: %.2f FPS, total: %.2f FPS).'\
             % (vs.i, net_t, total_t))
+    
+    ##Modify
+    np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(pts[:2,]), fmt='%d')
+    np.savetxt('dataset/features/features_%05d.txt' % vs.i,np.transpose(desc), fmt='%f')
+    # np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(print_pts[:2,]))
+    # np.savetxt('dataset/features/features_%05d.txt' % vs.i,np.transpose(print_desc))
+    ## Modify
 
   # Close any remaining windows.
   cv2.destroyAllWindows()
