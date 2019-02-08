@@ -14,16 +14,15 @@ class AtriumSFMExample(object):
         fov_in_degrees, w, h = 128, 160, 120
         self.calibration = gtsam.Cal3_S2(fov_in_degrees, w, h)
         self.truth = []
-        self.truth.points = []
 
     def generate_data(self):
 
         data = generator.Data(self.calibration, 3, 5)
 
-        data.Z = [[gtsam.Point2(0, 0), gtsam.Point2(1, 1), gtsam.Point2(2, 2), gtsam.Point2(3, 3), gtsam.Point2(4, 4)],
-                  [gtsam.Point2(0, 0), gtsam.Point2(1, 1), gtsam.Point2(
-                      2, 2), gtsam.Point2(3, 3), gtsam.Point2(4, 4)],
-                  [gtsam.Point2(0, 0), gtsam.Point2(1, 1), gtsam.Point2(2, 2), gtsam.Point2(3, 3), gtsam.Point2(4, 4)]]
+        data.Z = [[gtsam.Point2(88, 63), gtsam.Point2(72, 64), gtsam.Point2(61, 76), gtsam.Point2(82, 99), gtsam.Point2(92, 98)],
+                  [gtsam.Point2(76, 74), gtsam.Point2(60, 73), gtsam.Point2(
+                      46, 86), gtsam.Point2(59, 110), gtsam.Point2(70, 110)],
+                  [gtsam.Point2(86, 45), gtsam.Point2(70, 42), gtsam.Point2(56, 54), gtsam.Point2(60, 77), gtsam.Point2(70, 79)]]
         data.J = [[0, 1, 2, 3, 4], [0, 1, 2, 3, 4], [0, 1, 2, 3, 4]]
 
         return data
@@ -81,14 +80,14 @@ class AtriumSFMExample(object):
         result = optimizer.values()
 
         # Marginalization
-        # marginals = gtsam.Marginals(graph, result)
-        # marginals.marginalCovariance(symbol(ord('p'), 0))
-        # marginals.marginalCovariance(symbol(ord('x'), 0))
+        marginals = gtsam.Marginals(graph, result)
+        marginals.marginalCovariance(symbol(ord('p'), 0))
+        marginals.marginalCovariance(symbol(ord('x'), 0))
 
         # Print out result
         for i in range(self.nrCamera):
             print(symbol(ord('x'), i), ":", result.atPose3(symbol(ord('x'), i)))
-            self.truth.points.append(result.atPose3(symbol(ord('x'), i)))
+            # self.truth.points.append(result.atPose3(symbol(ord('x'), i)))
 
         for j in range(self.nrPoints):
             print(symbol(ord('p'), 0), ":", result.atPoint3(symbol(ord('p'), 0)))
