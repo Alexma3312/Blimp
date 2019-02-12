@@ -171,6 +171,8 @@ class TestVisualISAMExample(unittest.TestCase):
         # calculate expected point
         pn = calibration.calibrate(Point2(80.0, 60.0))  # normalized
         u, v = pn.x(), pn.y()
+        print(u)
+        print(v)
         depth = 10
         expected_point = Point3(depth*u, depth*v, depth)
         self.assertGtsamEquals(sfm.point(0), expected_point)
