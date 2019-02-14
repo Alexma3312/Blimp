@@ -22,6 +22,9 @@ def createPoints():
 
 def createPoses():
     # Create the set of ground-truth poses
+    # The ground truth poses include three camera poses
+    # The camera coordinate is transform into the world coordinate with matrix:
+    # The world coordinate is
     poses = []
     angle = 0
 

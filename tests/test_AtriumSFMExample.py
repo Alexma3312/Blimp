@@ -56,11 +56,11 @@ class TestAtriumSFMEample(unittest.TestCase):
 
         for i in range(len(poses)):
             pose_i = result.atPose3(symbol(ord('x'), i))
-            self.assertGtsamEquals(pose_i, poses[i], 0.5)
+            self.assertGtsamEquals(pose_i, poses[i], 1)
 
         for j in range(len(points)):
             point_j = result.atPoint3(symbol(ord('p'), j))
-            self.assertGtsamEquals(point_j, points[j], 0.1)
+            self.assertGtsamEquals(point_j, points[j], 1)
 
 
 if __name__ == "__main__":

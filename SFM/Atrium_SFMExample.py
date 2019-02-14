@@ -74,17 +74,17 @@ class AtriumSFMExample(object):
         s = np.radians(0)
         poseNoiseSigmas = np.array([0.3, 0.3, 0.3, 0.1, 0.1, 0.1])
         posePriorNoise = gtsam.noiseModel_Diagonal.Sigmas(poseNoiseSigmas)
-        angle = 30
+        angle = 0
         for i, y in enumerate([-1, 0, 1]):
             theta = np.radians(-y*angle)
             wRc = gtsam.Rot3(np.array([[0, math.cos(
                 theta), -math.sin(theta)], [0, -math.sin(theta), -math.cos(theta)], [1, 0, 0]]).T)
             wTi = gtsam.Pose3(wRc, gtsam.Point3(0, (y+1)*2.5, 1.5))
-            graph.add(gtsam.PriorFactorPose3(X(i),
-                                                wTi, posePriorNoise))
+            # graph.add(gtsam.PriorFactorPose3(X(i),
+            #                                     wTi, posePriorNoise))
             initialEstimate.insert(X(i), wTi)
 
-
+        graph.add(gtsam.PriorFactorPose3(X(0), gtsam.Pose3(wRc, gtsam.Point3(0, 0, 1.5)), posePriorNoise))
         pointNoiseSigma = 0.1
         pointPriorNoise = gtsam.noiseModel_Isotropic.Sigma(3, pointNoiseSigma)
         graph.add(gtsam.PriorFactorPoint3(P(0),
@@ -145,20 +145,20 @@ class AtriumSFMExample(object):
             wRc = gtsam.Rot3(np.array([[0, math.cos(
                 theta), -math.sin(theta)], [0, -math.sin(theta), -math.cos(theta)], [1, 0, 0]]).T)
             wTi = gtsam.Pose3(wRc, gtsam.Point3(0, (y+1)*2.5, 1.5))
-            graph.add(gtsam.PriorFactorPose3(X(i),
-                                             wTi, posePriorNoise))
+            # graph.add(gtsam.PriorFactorPose3(X(i),
+            #                                  wTi, posePriorNoise))
             initialEstimate.insert(X(i), wTi)
 
-        pointNoiseSigma = 5
-        pointPriorNoise = gtsam.noiseModel_Isotropic.Sigma(3, pointNoiseSigma)
-        # pointNoiseSigmas = np.array([5, 5, 5])
-        # pointPriorNoise = gtsam.noiseModel_Diagonal.Sigmas(pointNoiseSigmas)
-        # graph.add(gtsam.PriorFactorPoint3(P(0),
-        #                         Point3(10.0, 0.0, 0.0), pointPriorNoise))
+        graph.add(gtsam.PriorFactorPose3(X(0),
+                                             gtsam.Pose3(wRc, gtsam.Point3(0, 0, 1.5)), posePriorNoise))
+        
+        graph.add(gtsam.PriorFactorPose3(X(1),
+                                             gtsam.Pose3(wRc, gtsam.Point3(0, 2.5, 1.5)), posePriorNoise))
+
         # Add initial estimates for Points.
         for j in range(self.nrPoints):
             point_j = self.back_project(
-                data[i][j], self.calibration, 12)
+                data[i][j], self.calibration, 10)
             initialEstimate.insert(P(j), point_j)
 
         # Optimization
