@@ -90,8 +90,8 @@ class SuperPointNet(torch.nn.Module):
     self.convPb = torch.nn.Conv2d(c5, 65, kernel_size=1, stride=1, padding=0)
     # Descriptor Head.
     self.convDa = torch.nn.Conv2d(c4, c5, kernel_size=3, stride=1, padding=1)
-    self.convDb = torch.nn.Conv2d(c5, d1, kernel_size=1, stride=1, padding=0)
-
+import SuperPointPretrainedNetwork.SFM_superpoint as SFM_superpointstride=1, padding=0)
+import SuperPointPretrainedNetwork.SFM_superpoint as SFM_superpoint
   def forward(self, x):
     """ Forward pass that jointly computes unprocessed point and descriptor
     tensors.
@@ -667,10 +667,6 @@ if __name__ == '__main__':
     start1 = time.time()
     pts, desc, heatmap = fe.run(img)
     end1 = time.time()
-    ##modify
-    print_pts = pts
-    print_desc = desc    
-    ##modify
 
     # Add points and descriptors to the tracker.
     tracker.update(pts, desc)
@@ -733,10 +729,8 @@ if __name__ == '__main__':
             % (vs.i, net_t, total_t))
     
     ##Modify
-    np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(pts[:2,]), fmt='%d')
-    np.savetxt('dataset/features/features_%05d.txt' % vs.i,np.transpose(desc), fmt='%f')
-    # np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(print_pts[:2,]))
-    # np.savetxt('dataset/features/features_%05d.txt' % vs.i,np.transpose(print_desc))
+    # np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(pts[:2,]), fmt='%d')
+    # np.savetxt('dataset/features/features_%05d.txt' % vs.i,np.transpose(desc), fmt='%f')
     ## Modify
 
   # Close any remaining windows.
