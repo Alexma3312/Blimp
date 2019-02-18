@@ -1,24 +1,24 @@
+"""Unit Test to test Structure from Motion (SfM)."""
+import math
+import sys
 import unittest
 
 import gtsam
 import gtsam.utils.visual_data_generator as generator
-from gtsam import Point2, Point3, Pose3, symbol
-from SFM import Atrium_SFMExample as SFM
-from SFM import SFMdata
 import numpy as np
-import math
+from gtsam import Point2, Point3, Pose3, symbol
 
+from SFM import Atrium_SFM, SFMdata
 
+sys.path.append('SFM')
 
 class TestAtriumSFMEample(unittest.TestCase):
 
     def setUp(self):
-        self.sfm = SFM.AtriumSFMExample()
-        fov_in_degrees, w, h = 128, 640, 480
-        self.calibration = gtsam.Cal3_S2(fov_in_degrees, w, h)
-        # self.calibration = gtsam.Cal3_S2(50.0, 50.0, 0.0, 50.0, 50.0)
-        self.nrCameras = 3
-        self.nrPoints = 5
+        self.sfm = Atrium_SFM.AtriumSFM(3,5,128,640,480)
+        self.calibration = self.sfm.calibration
+        self.nrCameras = self.sfm.nrCameras
+        self.nrPoints = self.sfm.nrPoints
     
     def assertGtsamEquals(self, actual, expected, tol=1e-2):
         """Helper function that prints out actual and expected if not equal."""
@@ -33,8 +33,9 @@ class TestAtriumSFMEample(unittest.TestCase):
         self.assertGtsamEquals(actual_point, expected_point)
 
 
-    def test_Atrium_SFMExample(self):
-
+    def test_Atrium_SFM(self):
+        
+        # Create the set of actual points and poses
         actual_points = []
         actual_poses = []
 
@@ -44,23 +45,27 @@ class TestAtriumSFMEample(unittest.TestCase):
         # Create the set of ground-truth poses
         poses = SFMdata.createPoses()
         
-        # Create the five feature point data input for  Atrium_SFMExample()
-        feature_data = [[Point2()]*self.nrPoints]*self.nrCameras
+        # Create the nrCameras*nrPoints feature point data input for  Atrium_SFM()
+        # feature_data = [[Point2()]*self.nrPoints]*self.nrCameras
+        feature_data = SFMdata.Data(self.nrCameras, self.nrPoints)
 
         for i, pose in enumerate(poses):
             for j, point in enumerate(points):
+                feature_data.J[i][j] = j
                 camera = gtsam.PinholeCameraCal3_S2(pose, self.calibration)
-                feature_data[i][j] = camera.project(point)
+                feature_data.Z[i][j] = camera.project(point)
 
-        result = self.sfm.Atrium_SFMExample(feature_data)
+        result = self.sfm.Atrium_SFM(feature_data, 0, 2.5)
+
+        # print(result)
 
         for i in range(len(poses)):
             pose_i = result.atPose3(symbol(ord('x'), i))
-            self.assertGtsamEquals(pose_i, poses[i], 1)
+            self.assertGtsamEquals(pose_i, poses[i])
 
         for j in range(len(points)):
             point_j = result.atPoint3(symbol(ord('p'), j))
-            self.assertGtsamEquals(point_j, points[j], 1)
+            self.assertGtsamEquals(point_j, points[j])
 
 
 if __name__ == "__main__":
