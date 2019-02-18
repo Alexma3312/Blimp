@@ -24,7 +24,7 @@ class AtriumSFM(object):
 
     def __init__(self, nrCameras, nrPoints, fov_in_degrees, image_width, image_height):
         """
-        Args:
+        Parameters:
             nrCameras -- Number of cameras
             nrPoints -- Number of landmarks 
             fov_in_degrees -- Horizontal FOV = 128, Vertical FOV = 91, Diagonal FOV = 160
@@ -32,8 +32,7 @@ class AtriumSFM(object):
         """
         self.nrCameras = nrCameras
         self.nrPoints = nrPoints
-        fov_in_degrees, w, h = fov_in_degrees, image_width, image_height
-        self.calibration = gtsam.Cal3_S2(fov_in_degrees, w, h)
+        self.calibration = gtsam.Cal3_S2(fov_in_degrees, image_width, image_height)
         self.truth = []
 
     def back_project(self, feature_point, calibration, depth):
@@ -43,9 +42,12 @@ class AtriumSFM(object):
 
     def Atrium_SFM(self, data, rot_angle, y_distance):
         """
-        Args:
-
+        Parameters:
+            data -- a Data Object, input feature point data from the SFMdata.py file 
+            rot_angle -- degree, camera rotation angle in the x-z camera coordinate
+            y_distance -- distances between two continuous poses along the y axis 
         Returns:
+            result -- GTSAM optimization result
 
         """
         graph = gtsam.NonlinearFactorGraph()
@@ -57,13 +59,10 @@ class AtriumSFM(object):
             2, measurementNoiseSigma)
         for i in range(len(data.Z)):
             for k in range(len(data.Z[i])):
-                print(k)
-                print(data.Z[i][k])
                 j = data.J[i][k]
                 graph.add(gtsam.GenericProjectionFactorCal3_S2(
                     data.Z[i][j], measurementNoise,
                     X(i), P(j), self.calibration))
-                print(data.Z[i][j])
 
         # Create priors and initial estimate
         s = np.radians(30)
@@ -75,11 +74,12 @@ class AtriumSFM(object):
             # wRc = gtsam.Rot3(np.array([[0, math.cos(
             #     theta), -math.sin(theta)], [0, -math.sin(theta), -math.cos(theta)], [1, 0, 0]]).T)
             wRc = gtsam.Rot3(np.array([[0, 1, 0], [0, 0, -1], [1, 0, 0]]).T)
-            wTi = gtsam.Pose3(wRc, gtsam.Point3(0, (y+1)*y_distance, 1.5))
+            wTi = gtsam.Pose3(wRc, gtsam.Point3(0, (y+1)*y_distance, 1))
             # graph.add(gtsam.PriorFactorPose3(X(i),
             #                                     wTi, posePriorNoise))
             initialEstimate.insert(X(i), wTi)
 
+        # Add prior for two poses
         graph.add(gtsam.PriorFactorPose3(X(0), gtsam.Pose3(
             wRc, gtsam.Point3(0, 0, 1.5)), posePriorNoise))
         graph.add(gtsam.PriorFactorPose3(X(2), gtsam.Pose3(
@@ -97,31 +97,32 @@ class AtriumSFM(object):
                 data.Z[0][j], self.calibration, 10)
             initialEstimate.insert(P(j), point_j)
 
-        # initialEstimate.insert(P(0), Point3(10.0-0.25, 0.0+0.2, 0.0+0.15))
-        # initialEstimate.insert(P(1), Point3(10.0-0.25, 5.0+0.2, 0.0+0.15))
-        # initialEstimate.insert(P(2), Point3(10.0-0.25, 2.5+0.2, 2.5+0.15))
-        # initialEstimate.insert(P(3), Point3(10.0-0.25, 0.0+0.2, 5.0+0.15))
-        # initialEstimate.insert(P(4), Point3(10.0-0.25, 5.0+0.2, 5.0+0.15))
-
         # Optimization
         optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initialEstimate)
-        # result = optimizer.optimize()
+        result = optimizer.optimize()
 
-        for i in range(5):
-            optimizer.iterate()
-        result = optimizer.values()
+        # Optimize with limited iterations
+        # for i in range(5):
+        #     optimizer.iterate()
+        # result = optimizer.values()
 
         # Marginalization
-        # marginals = gtsam.Marginals(graph, result)
-        # marginals.marginalCovariance(X(0))
-        # marginals.marginalCovariance(X(2))
+        marginals = gtsam.Marginals(graph, result)
+        marginals.marginalCovariance(X(0))
 
         return result
 
 
 if __name__ == '__main__':
-    AtriumSFM = AtriumSFM(3, 5, 128, 640, 480)
-    data = SFMdata.Data(3, 5)
-    data.generate_data()
+    # Initial the number of landmark points and cameras 
+    nrCameras = 3
+    nrPoints = 5
+
+    AtriumSFM = AtriumSFM(nrCameras, nrPoints, 128, 640, 480)
+    # Generate Structure from Motion input data
+    data = SFMdata.Data(nrCameras, nrPoints)
+    data.generate_data(2)
+
+    # Generate Structure from Motion
     result = AtriumSFM.Atrium_SFM(data, 0, 2.5)
     print(result)

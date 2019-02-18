@@ -46,9 +46,9 @@ class TestAtriumSFMEample(unittest.TestCase):
         poses = SFMdata.createPoses()
         
         # Create the nrCameras*nrPoints feature point data input for  Atrium_SFM()
-        # feature_data = [[Point2()]*self.nrPoints]*self.nrCameras
         feature_data = SFMdata.Data(self.nrCameras, self.nrPoints)
 
+        # Project points back to the camera to generate feature points 
         for i, pose in enumerate(poses):
             for j, point in enumerate(points):
                 feature_data.J[i][j] = j
@@ -57,12 +57,14 @@ class TestAtriumSFMEample(unittest.TestCase):
 
         result = self.sfm.Atrium_SFM(feature_data, 0, 2.5)
 
-        # print(result)
+        print(result)
 
+        # Compare output poses with ground truth poses 
         for i in range(len(poses)):
             pose_i = result.atPose3(symbol(ord('x'), i))
             self.assertGtsamEquals(pose_i, poses[i])
 
+        # Compare output points with ground truth points 
         for j in range(len(points)):
             point_j = result.atPoint3(symbol(ord('p'), j))
             self.assertGtsamEquals(point_j, points[j])
