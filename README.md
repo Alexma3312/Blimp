@@ -22,7 +22,8 @@ The code relies on Superpoint and GTSAM
 ### Superpoint
 ### GTSAM
 
-## Undo
+## TODO list
 - []
 - []
+- [x]
 - [x]

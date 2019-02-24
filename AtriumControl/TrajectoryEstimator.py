@@ -55,11 +55,12 @@ class TrajectoryEstimator(object):
             self.estimate_trajectory -- (nrstate,6) numpy array of Pose3 values
             self.atrium_map -- (nrpoints,3) numpy array of gtsam.point3 values
         """
-        self.image_size = [160,120]
-        self.image_1 = read_image('dataset/wall_data/raw_frame_left.jpg', self.image_size)
-        self.image_2 = read_image('dataset/wall_data/raw_frame_middle.jpg', self.image_size)
-        self.image_3 = read_image('dataset/wall_data/raw_frame_right.jpg', self.image_size)
+        # self.image_size = [160,120]
+        # self.image_1 = read_image('dataset/wall_corresponding_feature_data/raw_frame_left.jpg', self.image_size)
+        # self.image_2 = read_image('dataset/wall_corresponding_feature_data/raw_frame_middle.jpg', self.image_size)
+        # self.image_3 = read_image('dataset/wall_corresponding_feature_data/raw_frame_right.jpg', self.image_size)
 
+        # Initial a list to save the trajectory, trajectory is 
         self.estimate_trajectory = []
         self.atrium_map = [Point3(0, 10.0, 10.0),
                            Point3(-10.0, 10.0, 10.0),
@@ -73,21 +74,22 @@ class TrajectoryEstimator(object):
         pn = self.calibration.calibrate(feature_point)  # normalized
         return gtsam.Point3(depth, depth*pn.x(), 1.5-pn.y()*depth)
 
-    def superpoint_generator(self, image):
-        """Use superpoint to extract features in the image
-        Return:
-            superpoint_feature - N*2 numpy array (u,v)
-        """
+    # def superpoint_generator(self, image):
+    #     # This should be outside of trajectory esetimator and should be inside Superpoint 
+    #     """Use superpoint to extract features in the image
+    #     Return:
+    #         superpoint_feature - N*2 numpy array (u,v)
+    #     """
 
-        # Refer to /SuperPointPretrainedNetwork/demo_superpoint for more information about the parameters
-        fe = demo_superpoint.SuperPointFrontend(weights_path='SuperPointPretrainedNetwork/superpoint_v1.pth',
-                          nms_dist=4,
-                          conf_thresh=0.015,
-                          nn_thresh=0.7,
-                          cuda=False)
-        superpoints, descriptors, _ = fe.run(self.image_1)
+    #     # Refer to /SuperPointPretrainedNetwork/demo_superpoint for more information about the parameters
+    #     fe = demo_superpoint.SuperPointFrontend(weights_path='SuperPointPretrainedNetwork/superpoint_v1.pth',
+    #                       nms_dist=4,
+    #                       conf_thresh=0.015,
+    #                       nn_thresh=0.7,
+    #                       cuda=False)
+    #     superpoints, descriptors, _ = fe.run(self.image_1)
         
-        return superpoints, descriptors
+    #     return superpoints, descriptors
 
     def feature_extract(self, superpoints, descriptors):
 
@@ -95,6 +97,15 @@ class TrajectoryEstimator(object):
         return input_features
 
     def feature_matching(self):
+        return
+
+    def pose_estimation(self):
+        return
+
+    def triangulation(self):
+        return
+
+    def landmark_matching(self):
         return
 
     def process_first_image(self, input_features):
@@ -194,7 +205,7 @@ class TrajectoryEstimator(object):
 
 if __name__ == "__main__":
     Trajectory_Estimator = TrajectoryEstimator()
-    superpoints_1, descriptors_1 = Trajectory_Estimator.superpoint_generator(
-        Trajectory_Estimator.image_1)
+    # superpoints_1, descriptors_1 = Trajectory_Estimator.superpoint_generator(
+    #     Trajectory_Estimator.image_1)
     Trajectory_Estimator.initial_iSAM()
 
