@@ -102,8 +102,8 @@ $ sudo python3 setup.py install  # to install system-wide
 
 
 ## TODO list
-- [] Blimp control hardware design
-- [] Blimp control through computer
-- [] Offline Mapping
-- [] Realtime Localization
-- [] Human Pose Detection
+- [x] Blimp control hardware design
+- [x] Blimp control through computer
+- [x] Offline Mapping
+- [x] Realtime Localization
+- [x] Human Pose Detection
