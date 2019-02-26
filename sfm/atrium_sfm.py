@@ -1,5 +1,5 @@
 """
-Structure from motion based on GTSAM
+Mapping based on Structure from Motion (SfM) with GTSAM
 """
 import math
 import unittest
@@ -8,7 +8,7 @@ import gtsam
 import numpy as np
 from gtsam import Point2, Point3, Pose3, symbol
 
-from SFM import SFMdata
+from sfm import sfm_data
 
 def X(i):
     """Create key for pose i."""
@@ -20,7 +20,7 @@ def P(j):
     return gtsam.symbol(ord('p'), j)
 
 
-class AtriumSFM(object):
+class AtriumSfm(object):
 
     def __init__(self, nrCameras, nrPoints, fov_in_degrees, image_width, image_height):
         """
@@ -28,7 +28,7 @@ class AtriumSFM(object):
             nrCameras -- Number of cameras
             nrPoints -- Number of landmarks 
             fov_in_degrees -- Horizontal FOV = 128, Vertical FOV = 91, Diagonal FOV = 160
-            image width and height -- camera output image [640,480], Superpoint output image [160,120]
+            image_width, image_height -- Note: camera output image [640,480], Superpoint output image [160,120]
         """
         self.nrCameras = nrCameras
         self.nrPoints = nrPoints
@@ -40,7 +40,7 @@ class AtriumSFM(object):
         pn = self.calibration.calibrate(feature_point)  # normalized
         return gtsam.Point3(depth, depth*(pn.x()), 1.5-(pn.y())*depth)
 
-    def Atrium_SFM(self, data, rot_angle, y_distance):
+    def atrium_sfm(self, data, rot_angle, y_distance):
         """
         Parameters:
             data -- a Data Object, input feature point data from the SFMdata.py file 
@@ -70,7 +70,7 @@ class AtriumSFM(object):
         posePriorNoise = gtsam.noiseModel_Diagonal.Sigmas(poseNoiseSigmas)
 
         for i, y in enumerate([-1, 0, 1]):
-            theta = np.radians(-y*rot_angle)
+            # theta = np.radians(-y*rot_angle)
             # wRc = gtsam.Rot3(np.array([[0, math.cos(
             #     theta), -math.sin(theta)], [0, -math.sin(theta), -math.cos(theta)], [1, 0, 0]]).T)
             wRc = gtsam.Rot3(np.array([[0, 1, 0], [0, 0, -1], [1, 0, 0]]).T)
@@ -118,11 +118,14 @@ if __name__ == '__main__':
     nrCameras = 3
     nrPoints = 5
 
-    AtriumSFM = AtriumSFM(nrCameras, nrPoints, 128, 640, 480)
+    # Create camera output image [640,480]
+    atriumSfm = AtriumSfm(nrCameras, nrPoints, 128, 640, 480)
+    
+    #  Initialize data 
+    data = sfm_data.Data(nrCameras, nrPoints)
     # Generate Structure from Motion input data
-    data = SFMdata.Data(nrCameras, nrPoints)
     data.generate_data(2)
 
     # Generate Structure from Motion
-    result = AtriumSFM.Atrium_SFM(data, 0, 2.5)
+    result = atriumSfm.atrium_sfm(data, 0, 2.5)
     print(result)

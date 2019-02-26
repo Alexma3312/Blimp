@@ -7,6 +7,7 @@ from gtsam import Pose3, Point3
 import math
 from SuperPointPretrainedNetwork import demo_superpoint
 import time
+from sfm import sfm_data
 
 
 def X(i):
@@ -17,17 +18,6 @@ def X(i):
 def P(j):
     """Create key for landmark j."""
     return gtsam.symbol(ord('p'), j)
-
-# def read_images():
-#     image_1 = cv2.imread('dataset/wall_data/raw_frame_left.jpg',0)
-#     image_2 = cv2.imread('dataset/wall_data/raw_frame_middle.jpg')
-#     image_3 = cv2.imread('dataset/wall_data/raw_frame_right.jpg')
-#     image_size = [160,120]
-#     interp = cv2.INTER_AREA
-#     image_4 = cv2.resize(image_1, (image_size[1], image_size[0]), interpolation=interp)
-#     image_4 = (image_4.astype('float32') / 255.)
-#     image_4 = video_streamer.read_image('dataset/wall_data/raw_frame_left.jpg', 160)
-#     return image_1, image_2, image_3, image_4
 
 def read_image(impath, img_size):
     """ Read image as grayscale and resize to img_size.
@@ -49,70 +39,55 @@ def read_image(impath, img_size):
 
 class TrajectoryEstimator(object):
 
-    def __init__(self):
+    def __init__(self, atrium_map):
         """
         Args:
             self.estimate_trajectory -- (nrstate,6) numpy array of Pose3 values
             self.atrium_map -- (nrpoints,3) numpy array of gtsam.point3 values
         """
-        # self.image_size = [160,120]
-        # self.image_1 = read_image('dataset/wall_corresponding_feature_data/raw_frame_left.jpg', self.image_size)
-        # self.image_2 = read_image('dataset/wall_corresponding_feature_data/raw_frame_middle.jpg', self.image_size)
-        # self.image_3 = read_image('dataset/wall_corresponding_feature_data/raw_frame_right.jpg', self.image_size)
+        self.image_size = [160,120]
+        self.image_1 = read_image('dataset/wall_corresponding_feature_data/raw_frame_left.jpg', self.image_size)
+        self.image_2 = read_image('dataset/wall_corresponding_feature_data/raw_frame_middle.jpg', self.image_size)
+        self.image_3 = read_image('dataset/wall_corresponding_feature_data/raw_frame_right.jpg', self.image_size)
 
         # Initial a list to save the trajectory, trajectory is 
         self.estimate_trajectory = []
-        self.atrium_map = [Point3(0, 10.0, 10.0),
-                           Point3(-10.0, 10.0, 10.0),
-                           Point3(-10.0, -10.0, 10.0),
-                           Point3(10.0, -10.0, 10.0),
-                           Point3(10.0, 10.0, -10.0),
-                           ]
+        self.atrium_map = atrium_map
 
-    def back_project(self, feature_point, calibration, depth):
-        """back-project to 3D point at given depth, in camera coordinates."""
-        pn = self.calibration.calibrate(feature_point)  # normalized
-        return gtsam.Point3(depth, depth*pn.x(), 1.5-pn.y()*depth)
 
-    # def superpoint_generator(self, image):
-    #     # This should be outside of trajectory esetimator and should be inside Superpoint 
-    #     """Use superpoint to extract features in the image
-    #     Return:
-    #         superpoint_feature - N*2 numpy array (u,v)
-    #     """
+    def superpoint_generator(self, image):
+        # This should be outside of trajectory esetimator and should be inside Superpoint 
+        """Use superpoint to extract features in the image
+        Return:
+            superpoint_feature - N*2 numpy array (u,v)
+        """
 
-    #     # Refer to /SuperPointPretrainedNetwork/demo_superpoint for more information about the parameters
-    #     fe = demo_superpoint.SuperPointFrontend(weights_path='SuperPointPretrainedNetwork/superpoint_v1.pth',
-    #                       nms_dist=4,
-    #                       conf_thresh=0.015,
-    #                       nn_thresh=0.7,
-    #                       cuda=False)
-    #     superpoints, descriptors, _ = fe.run(self.image_1)
+        # Refer to /SuperPointPretrainedNetwork/demo_superpoint for more information about the parameters
+        fe = demo_superpoint.SuperPointFrontend(weights_path='SuperPointPretrainedNetwork/superpoint_v1.pth',
+                          nms_dist=4,
+                          conf_thresh=0.015,
+                          nn_thresh=0.7,
+                          cuda=False)
+        superpoints, descriptors, _ = fe.run(self.image_1)
         
-    #     return superpoints, descriptors
+        return superpoints, descriptors
 
-    def feature_extract(self, superpoints, descriptors):
+    def feature_point_extraction(self, superpoints, descriptors):
 
-        input_features = 0
-        return input_features
+        features_points = 0
+        return features_points
 
-    def feature_matching(self):
-        return
+    def feature_point_matching(self, landmark, features_points):
+        
+        i = len(self.estimate_trajectory)
 
-    def pose_estimation(self):
-        return
+        
+        for point in landmark:
+            camera = gtsam.PinholeCameraCal3_S2(self.estimate_trajectory[i-1], self.calibration)
+            feature_data = camera.project(point)
 
-    def triangulation(self):
-        return
+        return features_points
 
-    def landmark_matching(self):
-        return
-
-    def process_first_image(self, input_features):
-        return
-
-    def process_next_image(self, input_features):
-        return
 
     def initial_iSAM(self):
         
@@ -141,11 +116,12 @@ class TrajectoryEstimator(object):
                                     point, pointPriorNoise))
             # Add initial estimates for Points.
         
-        self.angle = 0
-        theta = np.radians(-y*angle)
+        # Create the initial pose, X(0)
+        angle = 0
+        theta = np.radians(angle)
         self.wRc = gtsam.Rot3(np.array([[0, math.cos(
             theta), -math.sin(theta)], [0, -math.sin(theta), -math.cos(theta)], [1, 0, 0]]).T)
-        wTi = gtsam.Pose3(wRc, gtsam.Point3(0, 0, 1.5))
+        wTi = gtsam.Pose3(self.wRc, gtsam.Point3(0, 0, 1.5))
 
         pose_noise = gtsam.noiseModel_Diagonal.Sigmas(np.array(
                 [0.3, 0.3, 0.3, 0.1, 0.1, 0.1]))  # 30cm std on x,y,z 0.1 rad on roll,pitch,yaw
@@ -154,38 +130,61 @@ class TrajectoryEstimator(object):
         #Update the estimate_trajectory
         self.estimate_trajectory.append(wTi)
 
+    def first_frame_process(self, landmarks, extracted_feature_points):
+        
+        # Project landmarks into the initial camera, which is placed at the initial pose to generate expected feature points 
+        expected_feature_points = []
+        for point in landmarks:
+            camera = gtsam.PinholeCameraCal3_S2(self.estimate_trajectory[0], self.calibration)
+            expected_feature_points.append(camera.project(point)) 
+
+        # Compare and match expected_feature_points with extracted_feature_points to generate actual input feature points
+        feature_points = []
+        for i, point in enumerate(expected_feature_points):
+            feature_info = []
+            for feature in extracted_feature_points:
+                if (point.equals(feature, 1e-2)):
+                    feature_info.append(point) 
+                    feature_info.append(i) 
+                    print("feature_info:",feature_info)
+                feature_points.append(feature_info)
+        print(feature_points)
+
+        for i, feature in enumerate(feature_points):
+            print(feature[i][0])
+            print(feature[i][1])
+            self.graph.push_back(gtsam.GenericProjectionFactorCal3_S2(
+                feature[i][0], self.measurement_noise, X(0), P(feature[i][1]), self.calibration))
+
+        self.isam.update(self.graph, self.initial_estimate)
+
+        self.isam.update()
+        current_estimate = self.isam.calculateEstimate()
+        return current_estimate
+
 
     def update_iSAM(self, input_features):
 
-        
+        i = len(self.estimate_trajectory)
+
         # Add factors for each landmark observation
         for j, feature in enumerate(input_features):
-            i = len(self.estimate_trajectory)
             self.graph.push_back(gtsam.GenericProjectionFactorCal3_S2(
                 feature, self.measurement_noise, X(i), P(j), self.calibration))
 
-            point = self.back_project(feature, self.calibration, 10)
-        
         # Add an initial guess for the current pose
         # Intentionally initialize the variables off from the ground truth
-        initial_estimate.insert(X(i), pose.compose(gtsam.Pose3(
-            gtsam.Rot3.Rodrigues(-0.1, 0.2, 0.25), gtsam.Point3(0.05, -0.10, 0.20))))
-
-        s = np.radians(30)
-        poseNoiseSigmas = np.array([s, s, s, 5, 5, 5])
-        # poseNoiseSigmas = np.array([0.3, 0.3, 0.3, 5, 5, 5])
-        pose_noise = gtsam.noiseModel_Diagonal.Sigmas(poseNoiseSigmas)  # 30cm std on x,y,z 0.1 rad on roll,pitch,yaw
-        graph.push_back(gtsam.PriorFactorPose3(X(0), poses[0], 0))
+        self.initial_estimate.insert(X(i), self.estimate_trajectory(i-1))
 
         # Update iSAM with the new factors
-        isam.update(graph, initial_estimate)
+        self.isam.update(self.graph, self.initial_estimate)
         # Each call to iSAM2 update(*) performs one iteration of the iterative nonlinear solver.
         # If accuracy is desired at the expense of time, update(*) can be called additional
         # times to perform multiple optimizer iterations every step.
-        isam.update()
-        current_estimate = isam.calculateEstimate()
+        self.isam.update()
+        current_estimate = self.isam.calculateEstimate()
 
-        return
+        return current_estimate
 
     def trajectory_estimator(self, image):
         """Trajectory Estimator is a function based on iSAM to generate the estimate trajectory and the estimate state
@@ -204,8 +203,15 @@ class TrajectoryEstimator(object):
 
 
 if __name__ == "__main__":
-    Trajectory_Estimator = TrajectoryEstimator()
+    # Use the output of SFM as the map input
+    Atrium_Map = SFMdata.createPoints()
+    
+    # Create a new Trajectory estimator object
+    Trajectory_Estimator = TrajectoryEstimator(Atrium_Map)
+    
     # superpoints_1, descriptors_1 = Trajectory_Estimator.superpoint_generator(
     #     Trajectory_Estimator.image_1)
+
+    # Initialize a trajectory estimator object
     Trajectory_Estimator.initial_iSAM()
 
