@@ -35,7 +35,7 @@ class Map(object):
     """
 
     def __init__(self, points, descriptors):
-        self.landmark_points = points
+        self.landmark_points = np.array(points)
         self.descriptors = descriptors
 
     def get_landmark(self, point_index):
@@ -47,7 +47,7 @@ class Map(object):
 
 def create_atrium_map():
     """
-    
+
     """
     atrium_points = [
         Point3(10.0, -15.0, 15.0),
