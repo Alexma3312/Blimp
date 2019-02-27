@@ -117,7 +117,7 @@ class TrajectoryEstimator(object):
 
         """
         projected_feature_points = []
-        for point in self.atrium_map:
+        for point in self.atrium_map.landmark_points:
             camera = gtsam.PinholeCameraCal3_S2(pose, self.calibration)
             # feature is gtsam.Point2 object
             feature = camera.project(point)
