@@ -5,7 +5,7 @@
 4. Write doc string for each function including test functions.
 5. Write annotation for key steps of a function.
 6. Declare the function before you call it.
-7. Less Abreviations
+7. Less Abbreviations
 
 # Import GTSAM
 1. Download gtsam from:

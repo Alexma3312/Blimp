@@ -129,3 +129,5 @@ if __name__ == '__main__':
     # Generate Structure from Motion
     result = atriumSfm.atrium_sfm(data, 0, 2.5)
     print(result)
+
+    print(atriumSfm.back_project(Point2(0,0), atriumSfm.calibration, 10))

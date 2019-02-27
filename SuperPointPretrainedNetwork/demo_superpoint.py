@@ -90,6 +90,7 @@ class SuperPointNet(torch.nn.Module):
     self.convPb = torch.nn.Conv2d(c5, 65, kernel_size=1, stride=1, padding=0)
     # Descriptor Head.
     self.convDa = torch.nn.Conv2d(c4, c5, kernel_size=3, stride=1, padding=1)
+    self.convDb = torch.nn.Conv2d(c5, d1, kernel_size=1, stride=1, padding=0)
 
   def forward(self, x):
     """ Forward pass that jointly computes unprocessed point and descriptor
