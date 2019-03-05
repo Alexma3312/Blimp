@@ -5,10 +5,10 @@ import time
 import cv2
 import gtsam
 import numpy as np
-from gtsam import Point3, Pose3
+from gtsam import Point3, Point2, Pose3, symbol
 
 import torch
-from atrium_control.mapping_and_localization_data import Features
+from atrium_control.mapping_and_localization_data import Features, Map
 from sfm import sfm_data
 from SuperPointPretrainedNetwork.demo_superpoint import *
 
@@ -66,70 +66,9 @@ def read_images(downsample_width, downsample_height, width, height):
     return image_list
 
 
-def nearest_match(desc1, desc2, nn_thresh, pts1, pts2, pts_x_distance, pts_y_distance):
-    """
-    This function is develop base on demo_superpoint nn_match_two_way(self, desc1, desc2, nn_thresh) 
-    Performs two-way nearest neighbor matching of two sets of descriptors, such
-    that the NN match from descriptor A->B must equal the NN match from B->A.
-    Matches feature points that can meet the requirement of |pts1[0] - pts2[0]| < pts_x_distance 
-    and |pts1[1] - pts2[1]| < pts_y_distance.
-
-    Keyword arguments:
-        desc1 -- MxN numpy matrix of previous image N corresponding M-dimensional descriptors.
-        desc2 -- MxN numpy matrix of present image N corresponding M-dimensional descriptors.
-        nn_thresh -- Optional descriptor distance below which is a good match.
-        pts1 -- 3xN numpy array of previous image 2D point observations [x_i, y_i, confidence_i]^T.
-        pts2 -- 3xN numpy array of present image 2D point observations [x_i, y_i, confidence_i]^T.
-        pts_x_distance -- x coordinate matching distance range of feature pairs.
-        pts_y_distance -- y coordinate matching distance range of feature pairs.
-
-    Returns:
-        matches -- 3xL numpy array, of L matches, where L <= N and each column i is
-                    a match of two descriptors, d_i in image 1 and d_j' in image 2:
-                    [d_i index, d_j' index, match_score]^T
-    """
-    assert desc1.shape[0] == desc2.shape[0]
-    if desc1.shape[1] == 0 or desc2.shape[1] == 0:
-        return np.zeros((3, 0))
-    if nn_thresh < 0.0:
-        raise ValueError('\'nn_thresh\' should be non-negative')
-    # Compute L2 distance. Easy since vectors are unit normalized.
-    dmat = np.dot(desc1.T, desc2)
-    dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
-    # Get NN indices and scores.
-    idx = np.argmin(dmat, axis=1)
-    scores = dmat[np.arange(dmat.shape[0]), idx]
-    # Threshold the NN matches.
-    keep = scores < nn_thresh
-    # Check if nearest neighbor goes both directions and keep those.
-    idx2 = np.argmin(dmat, axis=0)
-    keep_bi = (np.arange(len(idx)) == idx2[idx])
-    keep = np.logical_and(keep, keep_bi)
-    # Check if the coordinates of matched feature pairs are within distance ranges.
-    m_idx1 = np.arange(desc1.shape[1])
-    m_idx2 = idx
-    if pts1.size is not 0 and pts2.size is not 0:
-        keep_distance_x = abs(
-            pts1[0, m_idx1]-pts2[0, m_idx2]) <= pts_x_distance
-        keep_distance_y = abs(
-            pts1[1, m_idx1]-pts2[1, m_idx2]) <= pts_y_distance
-        keep = np.logical_and(keep, keep_distance_x)
-        keep = np.logical_and(keep, keep_distance_y)
-    # Get the surviving point indices.
-    scores = scores[keep]
-    m_idx1 = m_idx1[keep]
-    m_idx2 = m_idx2[keep]
-    # Populate the final 3xN match data structure.
-    matches = np.zeros((3, int(keep.sum())))
-    matches[0, :] = m_idx1
-    matches[1, :] = m_idx2
-    matches[2, :] = scores
-    return matches
-
-
 class TrajectoryEstimator(object):
 
-    def __init__(self, atrium_map, past_pose, downsample_width, downsample_height, descriptor_threshold, feature_distance_threshold):
+    def __init__(self, atrium_map, downsample_width, downsample_height, l2_thresh, distance_thresh):
         """ A class to estimate the current camera pose with prebuilt map, an image, and the past pose.
         Args:
             atrium_map - a map object that include a N*3 numpy array of gtsam.Point3 and a N*M numpy array of M dimensions descriptors
@@ -147,9 +86,8 @@ class TrajectoryEstimator(object):
         self.calibration = gtsam.Cal3_S2(
             self.fov_in_degrees, self.image_width, self.image_height)
         self.atrium_map = atrium_map
-        self.pose = past_pose
-        self.threshold_d = descriptor_threshold
-        self.threshold_f = feature_distance_threshold
+        self.distance_threshold = distance_thresh
+        self.l2_threshold = l2_thresh
 
     def superpoint_generator(self, image):
         """Use superpoint to extract features in the image
@@ -169,93 +107,75 @@ class TrajectoryEstimator(object):
                                 nn_thresh=0.7,
                                 cuda=False)
         superpoints, descriptors, _ = fe.run(image)
+        print(superpoints)
 
+        # Transform superpoints from 3*N numpy array to N*2 numpy array
+        # Transform descriptors from 256*N numpy array to N*256 numpy array
         superpoints = np.transpose(superpoints[:2, ])
         descriptors = np.transpose(descriptors)
+        print(type(superpoints))
+        print(superpoints[0])
+        print(np.array(superpoints[0:3:]))
 
-        return Features(superpoints, descriptors)
+        # Transform superpoint into gtsam.Point2
+        # superpoints_reformat = []
+        # for point in superpoints:
+        #     superpoints_reformat.append(Point2(point))
+        superpoints_reformat = [Point2(point) for point in superpoints]
+        print(superpoints_reformat[0:3:])
+        # print(superpoints_reformat)
+        return Features(np.array(superpoints_reformat), descriptors)
 
-    def landmarks_projection(self):
+    def landmarks_projection(self, pose):
         """ Project landmark points in the map to the camera to filter landmark points outside the view of the current camera pose 
         Parameters:
             pose: gtsam.Point3, the pose of a camera
         Returns:
 
         """
+        # Check if the atrium map is empty
+        assert self.atrium_map.get_length(), "the atrium map is empty"
 
         points = []
         descriptors = []
         map_indices = []
 
         for i, landmark_point in enumerate(self.atrium_map.landmark_list):
-            camera = gtsam.PinholeCameraCal3_S2(self.pose, self.calibration)
+            camera = gtsam.PinholeCameraCal3_S2(pose, self.calibration)
             # feature is gtsam.Point2 object
             feature_point = camera.project(landmark_point)
-            print("feature:", feature_point)
             if (feature_point.x() > 0 and feature_point.x() < self.image_width
                     and feature_point.y() > 0 and feature_point.y() < self.image_height):
                 points.append(feature_point)
                 descriptors.append(self.atrium_map.get_descriptor_from_list(i))
                 map_indices.append(i)
-        print("projected_feature_points:", points)
-        print("projected_feature_points:", descriptors)
-        print("projected_feature:", map_indices)
+        # print("projected_feature_points:\n", points)
+        # print("projected_feature_descriptors:", descriptors)
+        # print("projected_feature_map_indices:", map_indices)
 
         return Features(np.array(points), np.array(descriptors)), map_indices
 
     def data_association(self, superpoint_features, projected_features, map_indices):
         """ Associate feature points with landmark points by matching all superpoint features with projected features.
         Parameters:
-            superpoint_features:
-            projected_features:
+            superpoint_features: 2*N numpy array
+            projected_features: 256*N numpy array
 
         Returns:
             matched_features:
             visible_map:
+
+        1. For each superpoint feature calculate the distances between itself and all the points in the map
+        2. Filter the points within the distance threshold
+        3. Calculate the L2 distance of the superpoint feature point and the filtered points
+        4. Choose the smallest L2 distance point
+
         """
 
-        pts1 = superpoint_features.key_points
-        desc1 = superpoint_features.descriptors
-
-        pts2 = projected_features.key_points
-        desc2 = projected_features.descriptors
-
-        assert desc1.shape[0] == desc2.shape[0]
-        if desc1.shape[1] == 0 or desc2.shape[1] == 0:
-            return np.zeros((3, 0))
-        if nn_thresh < 0.0:
+        if superpoint_features.get_length() == 0 or projected_features.get_length() == 0:
+            return Features(np.array([]), np.array([])), Map(np.array([]), np.array([]))
+        if self.l2_threshold < 0.0:
             raise ValueError('\'nn_thresh\' should be non-negative')
-        # Compute L2 distance. Easy since vectors are unit normalized.
-        dmat = np.dot(desc1, desc2.T)
-        dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
-        # Get NN indices and scores.
-        idx = np.argmin(dmat, axis=1)
-        scores = dmat[np.arange(dmat.shape[0]), idx]
-        # Threshold the NN matches.
-        keep = scores < nn_thresh
-        # Check if nearest neighbor goes both directions and keep those.
-        idx2 = np.argmin(dmat, axis=0)
-        keep_bi = (np.arange(len(idx)) == idx2[idx])
-        keep = np.logical_and(keep, keep_bi)
-        # Check if the coordinates of matched feature pairs are within distance ranges.
-        m_idx1 = np.arange(desc1.shape[1])
-        m_idx2 = idx
-        if pts1.size is not 0 and pts2.size is not 0:
-            keep_distance_x = abs(
-                pts1[0, m_idx1]-pts2[0, m_idx2]) <= pts_x_distance
-            keep_distance_y = abs(
-                pts1[1, m_idx1]-pts2[1, m_idx2]) <= pts_y_distance
-            keep = np.logical_and(keep, keep_distance_x)
-            keep = np.logical_and(keep, keep_distance_y)
-        # Get the surviving point indices.
-        scores = scores[keep]
-        m_idx1 = m_idx1[keep]
-        m_idx2 = m_idx2[keep]
-        # Populate the final 3xN match data structure.
-        matches = np.zeros((3, int(keep.sum())))
-        matches[0, :] = m_idx1
-        matches[1, :] = m_idx2
-        matches[2, :] = scores
 
         matched_features_points = []
         matched_features_descriptors = []
@@ -263,21 +183,39 @@ class TrajectoryEstimator(object):
         matched_landmark_points = []
         matched_landmark_decriptors = []
 
-        for idx in m_idx1:
-            matched_features_points.append(
-                superpoint_features.get_keypoint_from_list(idx))
-            matched_features_descriptors.append(
-                superpoint_features.get_descriptor_from_list(idx))
+        for i, superpoint in enumerate(superpoint_features.key_point_list):
 
-        for idx in m_idx2:
-            matched_landmark_points.append(
-                self.atrium_map.get_landmark_from_list(map_indices(idx)))
-            matched_landmark_decriptors.append(
-                self.atrium_map.get_descriptor_from_list(map_indices(idx)))
+            feature_index_list = []
+            min_score = self.l2_threshold
+            matched_landmark_idx = 0
 
+            for j, projected_point in enumerate(projected_features.key_point_list):
+                if(abs(superpoint.x() - projected_point.x()) < self.distance_threshold and abs(superpoint.y() - projected_point.y()) < self.distance_threshold):
+                    feature_index_list.append(j)
+
+            for feature_index in feature_index_list:
+                # Compute L2 distance. Easy since vectors are unit normalized.
+                dmat = np.dot(superpoint_features.descriptor(
+                    i), projected_features.descriptor(feature_index).T)
+                dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
+
+                if dmat < min_score:
+                    min_score = dmat
+                    matched_landmark_idx = feature_index
+
+            if min_score < self.l2_threshold:
+                matched_features_points.append(
+                    superpoint_features.get_keypoint_from_list(i))
+                matched_features_descriptors.append(
+                    superpoint_features.get_descriptor_from_list(i))
+
+                matched_landmark_points.append(
+                    self.atrium_map.get_landmark_from_list(map_indices[matched_landmark_idx]))
+                matched_landmark_decriptors.append(
+                    self.atrium_map.get_descriptor_from_list(map_indices[matched_landmark_idx]))
         return Features(np.array(matched_features_points), np.array(matched_features_descriptors)), Map(np.array(matched_landmark_points), np.array(matched_landmark_decriptors))
 
-    def trajectory_estimator(self, features, visible_map):
+    def trajectory_estimator(self, features, visible_map, pose):
         """
         Input features with corresponding landmark indices.
         This will be used to create factors to connect estimate pose with landmarks in the map
@@ -290,23 +228,26 @@ class TrajectoryEstimator(object):
         measurementNoiseSigma = 1.0
         measurementNoise = gtsam.noiseModel_Isotropic.Sigma(
             2, measurementNoiseSigma)
-        for i,feature in enumerate(features.key_point_list):
+        for i, feature in enumerate(features.key_point_list):
             graph.add(gtsam.GenericProjectionFactorCal3_S2(
-                    feature, measurementNoise,
-                    X(0), P(i), self.calibration))
+                feature, measurementNoise,
+                X(0), P(i), self.calibration))
 
-        # Create initial estimate for the first pose
-        initialEstimate.insert(X(0), self.pose)
+        # Create initial estimate for the pose
+        # Because the robot moves slowly, we can use the previous pose as an initial estimation of the current pose.
+        initialEstimate.insert(X(0), pose)
 
-        # Create priors for visual 
-        posePriorNoise = gtsam.noiseModel_Isotropic.Sigma(6, 0)
-        for i,landmark in enumerate(visible_map.landmark_list):
+        # Create priors for visual
+        pointPriorNoise = gtsam.noiseModel_Isotropic.Sigma(3, 0.01)
+        for i, landmark in enumerate(visible_map.landmark_list):
             graph.add(gtsam.PriorFactorPoint3(P(i),
-                                landmark, pointPriorNoise))
+                                              landmark, pointPriorNoise))
             initialEstimate.insert(P(i), landmark)
 
         # Optimization
         optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initialEstimate)
         result = optimizer.optimize()
+
+        print(result.atPose3(symbol(ord('x'), 0)))
 
         return result
