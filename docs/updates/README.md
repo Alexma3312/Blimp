@@ -49,6 +49,7 @@ export PYTHONPATH=$PYTHONPATH:<GTSAM_CYTHON_INSTALL_PATH>
 2. import will automatically create an object of the class
 3. What is an up direction vector for camera
 - up direction vector determine the row of the camera, pitch and yaw are determined by the target and camera eye pose
+
 # Unit Tests Brief Description
 
 ## Arguments
