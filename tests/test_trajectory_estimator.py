@@ -1,4 +1,4 @@
-"""Test incremental visual SAM."""
+"""Test trajectory estimator."""
 
 import unittest
 
@@ -11,15 +11,16 @@ from sfm import sfm_data
 import cv2
 
 from atrium_control.trajectory_estimator import read_image, TrajectoryEstimator
+from tests.trajectory_estimator_data import create_atrium_map, Trajectory
 
 def read_images(width, height):
     """
     Read a list of images from the dataset folder then resize and transfer each image to grey scale image 
     """
     image_list = []
-    image_1 = read_image('dataset/wall_corresponding_feature_data/raw_frame_left.jpg', [width,height])
-    image_2 = read_image('dataset/wall_corresponding_feature_data/raw_frame_middle.jpg', [width,height])
-    image_3 = read_image('dataset/wall_corresponding_feature_data/raw_frame_right.jpg', [width,height])
+    image_1 = read_image('datasets/wall_corresponding_feature_data/raw_frame_left.jpg', [width,height])
+    image_2 = read_image('datasets/wall_corresponding_feature_data/raw_frame_middle.jpg', [width,height])
+    image_3 = read_image('datasets/wall_corresponding_feature_data/raw_frame_right.jpg', [width,height])
     image_list.append(image_1)
     image_list.append(image_2)
     image_list.append(image_3)
@@ -31,16 +32,25 @@ class TestTrajectoryEstimator(unittest.TestCase):
     def setUp(self):
 
         # Import SFM map output as Trajectory Estimator map input
-        self.atrium_map = sfm_data.create_points()
+        self.atrium_map = create_atrium_map()
 
         # Create an input image list
         self.image_list = read_images(640,480)
 
         # Use the poses in SFM as the actual estimate trajectory
         #self.past_trajectory_estimate = SFMdata.createPoses()
-        self.trajectory = sfm_data.create_poses()
+        self.trajectory_estimator = TrajectoryEstimator(self.atrium_map, 4, 4, 0.7, 2)
+        self.trajectory = Trajectory(128,640,480,5)
+        self.trajectory.create_poses()
+        self.trajectory.create_past_poses(0.01)  
+        self.trajectory.create_project_features()
+        self.trajectory.create_map_indices()
+        self.trajectory.create_superpoint_features()
+        self.trajectory.create_matched_features()
+        self.trajectory.create_visible_map()
+        
 
-    def assertGtsamEquals(self, actual, expected, tol=2):
+    def assertGtsamEquals(self, actual, expected, tol=1e-2):
         """Helper function that prints out actual and expected if not equal."""
         equal = actual.equals(expected, tol)
         if not equal:
@@ -53,90 +63,25 @@ class TestTrajectoryEstimator(unittest.TestCase):
             self.assertGtsamEquals(actual_list[i], expect_list[i])
 
     def test_landmarks_projection(self):
-        
-        return
-    
+        for pose in self.trajectory.past_poses:
+            project_features, map_indices = self.trajectory_estimator.landmarks_projection(pose)
+
+    def test_descriptor_match(self):
+        # Calculate distances of unit normalized vectors
+        desc1 = np.array([0,0,1])
+        desc2 = np.array([0,0,1])
+        dmat = np.dot(desc1, desc2.T)
+        dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
+        self.assertEqual(dmat, 0)
+
+    def test_data_association(self):
+        for i,pose in enumerate(self.trajectory.past_poses):
+            matched_features, visible_map = self.trajectory_estimator.data_association(self.trajectory.superpoint_features[i],self.trajectory.projected_features[i],self.trajectory.map_indices[i])
+
     def test_trajectory_estimator(self):
-        for i, image in enumerate(self.image_list):
-            superpoints, descriptors = TrajectoryEstimator.superpoint_generator(self.atrium_map, image)
-            
-        return 1
-        
-
-
-
-
-    # def test_first_frame_process(self):
-
-    #     actual_first_frame_feature_points = []
-    #     actual_first_frame_landmarks = self.atrium_map
-
-    #     # Initialize trajectory estimator
-    #     trajectory_estimator = TrajectoryEstimator(self.atrium_map)
-
-    #     # Initialize factor graph
-    #     trajectory_estimator.initial_iSAM()
-
-    #     for point in self.atrium_map:
-    #         camera = gtsam.PinholeCameraCal3_S2(
-    #             trajectory_estimator.estimate_trajectory[0], trajectory_estimator.calibration)
-    #         actual_first_frame_feature_points.append(camera.project(point))
-
-    #     current_estimate = trajectory_estimator.first_frame_process(
-    #         actual_first_frame_landmarks, actual_first_frame_feature_points)
-
-    #     # Compare output poses with ground truth poses
-    #     pose_0 = current_estimate.atPose3(symbol(ord('x'), 0))
-    #     self.assertGtsamEquals(
-    #         pose_0, trajectory_estimator.estimate_trajectory[0])
-
-    #     # Compare output points with ground truth points
-    #     for j, point in enumerate(self.atrium_map):
-    #         point_j = current_estimate.atPoint3(symbol(ord('p'), j))
-    #         self.assertGtsamEquals(point_j, point[j])
-
-    # def test_feature_point_matching(self):
-    #     return
-
-    # def test_trajectory_estimator(self):
-
-    #     # Initialize trajectory estimator
-    #     trajectory_estimator = TrajectoryEstimator(self.atrium_map)
-
-    #     # Initialize factor graph
-    #     trajectory_estimator.initial_iSAM()
-
-    #     # Traverse through each image to generate trajectory poses
-    #     for i, image in enumerate(self.Images):
-
-    #         # Use Superpoint to generate all feature points
-    #         # trajectory_estimator.superpoint_generator(image)
-
-    #         # Find all manually selected feature points from all Superpoint features by matching descriptors
-    #         # trajectory_estimator.feature_point_extraction(self, superpoints, descriptors)
-
-    #         feature_data = []
-
-    #         if(i == 0):
-    #             for point in enumerate(self.atrium_map):
-    #                 camera = gtsam.PinholeCameraCal3_S2(
-    #                     trajectory_estimator.estimate_trajectory[0], trajectory_estimator.calibration)
-    #                 feature_data.append(camera.project(point))
-    #             trajectory_estimator.first_frame_process(
-    #                 self.atrium_map, feature_data)
-    #         else:
-    #             for point in enumerate(self.atrium_map):
-    #                 camera = gtsam.PinholeCameraCal3_S2(
-    #                     trajectory_estimator.estimate_trajectory[i-1], trajectory_estimator.calibration)
-    #                 feature_data.append(camera.project(point))
-    #             trajectory_estimator.feature_point_matching(
-    #                 self.atrium_map, feature_data)
-    #             trajectory_estimator.update_iSAM(feature_data)
-
-    #     self.assertGtsamListEqual([Point3(0, 0, 0), Point3(2, 2, 3)], [
-    #                               Point3(0, 0, 0), Point3(2, 2, 3)])
-
-
-
+        for i,pose in enumerate(self.trajectory.past_poses):
+            result = self.trajectory_estimator.trajectory_estimator(self.trajectory.matched_features[i], self.trajectory.visible_map[i],pose)
+            pose_i = result.atPose3(symbol(ord('x'), 0))
+            self.assertGtsamEquals(pose_i, self.trajectory.poses[i],0.5)
 if __name__ == "__main__":
     unittest.main()
