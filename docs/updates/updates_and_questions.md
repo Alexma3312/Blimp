@@ -116,5 +116,87 @@ np.savetxt('foo.csv',a,fmt='%10.5f',delimiter=',')
 - [x] Complete data association.
 - [ ] `Features` and `Map` compare, assert equal function
 - [ ] `Features` and `Map` append function
-- [ ] data association unittest
+- [x] data association unittest
 
+
+## 3.5
+
+### Record
+
+- calibration matrix can be thought as similarity transform : cP = cRw * wP
+	* `cRw`: [[F,0,Ux],[0,F,Vy],[0,0,1]]
+
+### Progress
+
+- [-] unittest for group action similarity transform on poses coordinates (check sim3 in GTSAM
+	- Robert Mahony Geometic for SLAM.pdf
+- [ ] use constraint factors for trajectory estimator factor graph
+- [ ] change the input of trajectory estimator from a pose to a trajectory
+- [ ] tuple input
+
+
+## 3.8
+
+### Questions
+
+- [ ] Differences between WiFi module as client and server?
+
+- [ ] ESP8266 wifi module control 
+	- https://www.youtube.com/watch?v=2AL7HfiRlp4&vl=en
+	- https://tttapa.github.io/ESP8266/Chap07%20-%20Wi-Fi%20Connections.html
+	- 	(Not important: https://www.youtube.com/watch?v=QVcpzwY4hWI)
+
+### Control Progress
+
+- [x] Power ESP8266 with battery 
+- [x] Ping laptop with ESP8266 as a WIFI client through personal hotspot
+- [x] Create a WiFi server with the ESP8266, connect both laptop and ESP8266 with personal hotspot.
+	- Result display in chrome
+	- https://www.youtube.com/watch?v=m2fEXhl70OY
+
+- [x] ESP8266 GPIO 16 write voltage, and use positive voltage to control motor
+	- https://www.youtube.com/watch?v=CpWhlJXKuDg
+
+- [ ] ESP8266 GPIO index and the corresponding port
+
+- [ ] ESP8266, how to generate negative voltage?
+
+
+## 3.9
+
+### Questions
+
+- [x] Does `gtsam` has constraint factor?
+	* Yes, it does but it is not wrapped by cython.
+- [x] How to know which libraries are convert to python version?
+	- The problem is sim3 seems to be not able to import. 
+	* In `gtsam`->`cython`->`tests`->`gtsam_test.h`
+- [x] Why are there two type of similarity transform structure?
+	* One is [sR t; 0 1], other one is [R t; 0 1/s]
+	* They are actually the same. Just the translation matrices are different. t(from the left matrix) = st(from the right matrix)
+
+### Progress
+
+- [ ] unittest for group action similarity transform on poses coordinates (check sim3 in GTSAM
+	- Robert Mahony Geometic for SLAM.pdf
+
+- [ ] Import Sim3
+- [ ] similarity transform on Pose3 
+- [ ] similarity transform calculation with `poses`
+- [ ] constraint factor
+
+
+## 3.10
+
+### Progress
+
+- [ ] Create map object to include both landmarks and the trajectory
+- [ ] Create similarity3 class to generate similarity transform matrix will poses, and use similarity transform to calculate the transform map
+- [ ] Run unittests
+- [ ] Test the similarity transform class on the SFM output
+- [ ] Modify trajectory estimator, `change the pose input into trajectory input` and `Document` the code.
+- [ ] Refactor code and make a PR 
+
+- [ ] Upload the panorama assignment to gradescope
+- [ ] Finish English assignments
+- [ ] Finish the Gas Association Document
