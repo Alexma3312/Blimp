@@ -3,6 +3,7 @@
 import gtsam
 import numpy as np
 from gtsam import Point2, Point3, Pose3
+import numpy.testing as npt
 
 
 class Features(object):
@@ -20,6 +21,10 @@ class Features(object):
         self.key_point_list = key_points.tolist()
         self.descriptor_list = descriptors.tolist()
 
+    def get_length(self):
+        assert len(self.key_point_list) == len(self.descriptor_list)
+        return len(self.key_point_list)
+
     def get_keypoint(self, point_index):
         return self.key_points[point_index]
 
@@ -31,6 +36,30 @@ class Features(object):
 
     def get_descriptor_from_list(self, descriptor_index):
         return self.descriptor_list[descriptor_index]
+
+    def append(self, key_point, descriptor):
+        self.key_point_list.append(key_point)
+        self.descriptor_list.append(descriptor)
+        self.key_points = np.array(self.key_point_list)
+        self.descriptors = np.array(self.descriptor_list)
+
+    def assert_almost_equal(self, Features):
+        # This function is for unittest, to test whether the actual output and expected output are the same
+        
+        # the size should be the same
+        # the gtsam.point object should have the same value
+        # the descriptors should have small L2 distance
+        
+        # r1 = npt.assert_almost_equal(self.key_points, Features.key_points)
+        r2 = npt.assert_almost_equal(self.descriptors, Features.descriptors)
+        return r2
+
+    
+class Trajectory(object):
+    def __init__(self):
+        self.trajectory = []
+    def get_length(self):
+        return len(self.trajectory)
 
 
 
@@ -49,6 +78,10 @@ class Map(object):
         self.landmark_list = points.tolist()
         self.descriptor_list = descriptors.tolist()
 
+    def get_length(self):
+        assert len(self.landmark_list) == len(self.descriptor_list)
+        return len(self.landmark_list)
+
     def get_landmark(self, point_index):
         return self.landmark_points[point_index]
 
@@ -60,3 +93,16 @@ class Map(object):
 
     def get_descriptor_from_list(self, descriptor_index):
         return self.descriptor_list[descriptor_index]
+
+    def append(self, point, descriptor):
+        self.landmark_list.append(point)
+        self.descriptor_list.append(descriptor)
+        self.landmark_points = np.array(self.landmark_list)
+        self.descriptors = np.array(self.descriptor_list)
+    
+    def assert_almost_equal(self, Map):
+        # This function is for unittest, to test whether the actual output and expected output are the same
+        # r1 = npt.assert_almost_equal(self.landmark_points, Map.key_points)
+        r2 = npt.assert_almost_equal(self.descriptors, Map.descriptors)
+        return r2
+
