@@ -188,11 +188,15 @@ np.savetxt('foo.csv',a,fmt='%10.5f',delimiter=',')
 
 ## 3.10
 
+### Questions
+
+- [ ] Does gtsam->python->handwritten include all the classes that are wrapped into python in gtsam? 
+
 ### Progress
 
 - [ ] Create map object to include both landmarks and the trajectory
 - [ ] Create similarity3 class to generate similarity transform matrix will poses, and use similarity transform to calculate the transform map
-- [ ] Run unittests
+- [ ] Create unittests
 - [ ] Test the similarity transform class on the SFM output
 - [ ] Modify trajectory estimator, `change the pose input into trajectory input` and `Document` the code.
 - [ ] Refactor code and make a PR 
@@ -200,3 +204,45 @@ np.savetxt('foo.csv',a,fmt='%10.5f',delimiter=',')
 - [ ] Upload the panorama assignment to gradescope
 - [ ] Finish English assignments
 - [ ] Finish the Gas Association Document
+
+## 3.11
+
+### Questions
+
+- [ ] Is the rotation matrix of poses also orthogonal?
+- [ ] negative cubic root
+- [ ] zero determinant discussion
+- [ ] What if scalar is zero? scalars of homogeneous and transformation matrix
+- [x] Finish similarity class function and unittests
+
+
+## 3.24
+
+### Progress
+- [x] Finish sim2 align with point2 pairs
+- [x] Finish sim3 align with pose3 pairs
+
+
+## 3.25
+
+### Questions
+
+### Progress
+- [-] Solve sim3 s == 0
+- [x] sim3 map_transform()
+
+## 3.27
+
+### Questions
+
+- [ ] How to use sim3 in mapping
+- [ ] In localization, does the descriptor idea works?
+- [ ] CUrrent with the code we can only generate 3 states. How to generate 12 states? 
+- [ ] Group meeting for the Blimps.
+
+### Progress
+
+- [ ] Finish the current branch
+- [ ] Solve and improve sim3 s == 0 
+- [ ] Add GTSAM unittest
+- [ ] Make a PR for Frank
