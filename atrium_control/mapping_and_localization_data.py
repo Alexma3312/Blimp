@@ -54,18 +54,6 @@ class Features(object):
         self.key_points = np.array(self.key_point_list)
         self.descriptors = np.array(self.descriptor_list)
 
-    def assert_almost_equal(self, Features):
-        """This function is for unittest, to test whether the actual output and expected output are the same
-
-        the size should be the same
-        the gtsam.point object should have the same value
-        the descriptors should have small L2 distance
-
-        r1 = npt.assert_almost_equal(self.key_points, Features.key_points)
-        """
-        r2 = npt.assert_almost_equal(self.descriptors, Features.descriptors)
-        return r2
-
 
 class Map(object):
     """
@@ -76,10 +64,10 @@ class Map(object):
         descriptors - an N*M numpy array of M dimension descriptors, for Superpoint M = 256
         landmark_list - an N*3 list
         descriptor_list - an N*M list
-        trajectory - an N*6 numpy array of N gtsam.Pose3 objects
+        trajectory - an N*6 list of N gtsam.Pose3 objects
     """
 
-    def __init__(self, points=np.zeros((0, 3)), descriptors=np.zeros((0, 256)), trajectory=np.zeros((6, 0))):
+    def __init__(self, points=np.zeros((0, 3)), descriptors=np.zeros((0, 256)), trajectory=[]):
         self.landmark_points = points
         self.descriptors = descriptors
         self.landmark_list = points.tolist()
@@ -121,9 +109,3 @@ class Map(object):
     def append_trajectory(self, pose):
         """ Add a pose into trajectory."""
         self.trajectory.append(pose)
-
-    def assert_almost_equal(self, Map):
-        # This function is for unittest, to test whether the actual output and expected output are the same
-        # r1 = npt.assert_almost_equal(self.landmark_points, Map.key_points)
-        r2 = npt.assert_almost_equal(self.descriptors, Map.descriptors)
-        return r2
