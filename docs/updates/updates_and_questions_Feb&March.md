@@ -246,3 +246,45 @@ np.savetxt('foo.csv',a,fmt='%10.5f',delimiter=',')
 - [ ] Solve and improve sim3 s == 0 
 - [ ] Add GTSAM unittest
 - [ ] Make a PR for Frank
+
+## 3.28
+
+### Progress
+
+- [x] Solve python external module import problem
+http://python-notes.curiousefficiency.org/en/latest/python_concepts/import_traps.html
+https://blog.csdn.net/chinesepython/article/details/82113575
+https://blog.csdn.net/weixin_38256474/article/details/81228492
+- `Note`: The problem is caused by the difference between absolute path and relative path
+	- If code is ran in a terminal, it is relative path, the root path starts at the current path and need to add `../`
+	- If code is ran in VScode, it is also relative path but the root path starts at the `Blimps` 
+- This will cause problems when importing or reading files or images
+
+
+- [-] Refactor 
+	- [x] atrium_sfm
+		- atrium_sfm & test_atrium_sfm: refactor code and solve import problem.
+		- sfm_data: Code refactor
+
+
+
+## 3.29 & 3.30
+### Question
+
+- [ ] Use constant factor? Where is constant factor?
+
+### Progress
+- [x] Refactor 
+	- [x] trajectory_estimator 
+- [x] Create new readme for `atrium_control`, `sfm`, `test`, and `ESP8266`
+- [x] Trajectory estimator use trajectory input instead of pose
+- [x] Add trajectory assert equal, for landmark projection and data_association
+
+- [ ] PR
+
+- [ ] add sim3 generator with points 
+- [ ] sim3 s Improvement
+- [ ] sim2 Unittest 
+
+- [ ] Presentation
+- [ ] Collect New Data
