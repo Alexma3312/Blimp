@@ -1,13 +1,12 @@
 """
 Functions to generate structure-from-motion ground truth data and iSAM input data.
-
 """
 
-import numpy as np
 import math
-import cv2
 
+import cv2
 import gtsam
+import numpy as np
 from gtsam import Point2
 
 
@@ -52,6 +51,8 @@ def read_images():
 
 
 class Data(object):
+    """Create input data included camera poses and landmark points for Structure from Motion. """
+
     def __init__(self, nrCameras, nrPoints):
         self.nrCameras = nrCameras
         self.nrPoints = nrPoints
@@ -60,7 +61,7 @@ class Data(object):
         self.J = [x[:] for x in [[0] * self.nrPoints] * self.nrCameras]
 
     def generate_data(self, choice):
-
+        """All feature points are manually collected. """
         if choice == 0:
             # Generate a 5 points Map data. Points are within [160,120].
             self.Z = [[Point2(88, 63), Point2(72, 64), Point2(61, 76), Point2(82, 99), Point2(92, 98)],

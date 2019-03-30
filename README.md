@@ -29,10 +29,10 @@ This project is a front end vision and control system than can be deployed on a 
 
 ## Software
 
-- This code is developed with Ubuntu 16.04 LST with python3
-- The code relies on Superpoint and GTSAM
-- Superpoint requires opencv and torch
-- GTSAM requires boost and cmake
+- This project is developed in Ubuntu 16.04 LST with python3
+- The project relies on `Superpoint` and `GTSAM`
+- `Superpoint` requires `opencv` and `torch`
+- `GTSAM` requires `boost` and `cmake`
 
 ### Offline Mapping
 
@@ -99,6 +99,14 @@ $ sudo python3 setup.py install  # to install system-wide
 ```
 
 ## Coding Dogma
+1. Unittest: https://docs.python.org/3/library/unittest.html
+2. We will need to follow the google python style for coding: https://github.com/google/styleguide/blob/gh-pages/pyguide.md
+3. Write [doc string](https://www.geeksforgeeks.org/python-docstrings) at the beginning of each script
+4. Write doc string for each function including test functions.
+5. Write annotation for key steps of a function.
+6. Declare the function before you call it.
+7. Less Abbreviations
+8. The programming paradigm is `functional programming`
 
 
 ## TODO list

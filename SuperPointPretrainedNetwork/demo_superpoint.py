@@ -90,6 +90,7 @@ class SuperPointNet(torch.nn.Module):
     self.convPb = torch.nn.Conv2d(c5, 65, kernel_size=1, stride=1, padding=0)
     # Descriptor Head.
     self.convDa = torch.nn.Conv2d(c4, c5, kernel_size=3, stride=1, padding=1)
+    self.convDb = torch.nn.Conv2d(c5, d1, kernel_size=1, stride=1, padding=0)
 
   def forward(self, x):
     """ Forward pass that jointly computes unprocessed point and descriptor
@@ -729,8 +730,9 @@ if __name__ == '__main__':
     
     ## Modify Start
     # This is used to save the features information of each frame into a .txt file,
-    # np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(pts[:2,]), fmt='%d')
+    np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(pts[:2,]), fmt='%d')
     # np.savetxt('dataset/features/features_%05d.txt' % vs.i,np.transpose(desc), fmt='%f')
+    np.savetxt('dataset/features/features_%05d.csv'% vs.i,np.transpose(desc),fmt='%10.5f',delimiter=',')
     ## Modify End
 
   # Close any remaining windows.
