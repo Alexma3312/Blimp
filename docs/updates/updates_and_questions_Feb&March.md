@@ -235,17 +235,17 @@ np.savetxt('foo.csv',a,fmt='%10.5f',delimiter=',')
 
 ### Questions
 
-- [ ] How to use sim3 in mapping
-- [ ] In localization, does the descriptor idea works?
-- [ ] CUrrent with the code we can only generate 3 states. How to generate 12 states? 
-- [ ] Group meeting for the Blimps.
+- [-] How to use sim3 in mapping
+- [-] In localization, does the descriptor idea works?
+- [-] CUrrent with the code we can only generate 3 states. How to generate 12 states? 
+- [x] Group meeting for the Blimps.
 
 ### Progress
 
-- [ ] Finish the current branch
-- [ ] Solve and improve sim3 s == 0 
-- [ ] Add GTSAM unittest
-- [ ] Make a PR for Frank
+- [-] Finish the current branch
+- [-] Solve and improve sim3 s == 0 
+- [-] Add GTSAM unittest
+- [-] Make a PR for Frank
 
 ## 3.28
 
@@ -273,6 +273,12 @@ https://blog.csdn.net/weixin_38256474/article/details/81228492
 
 - [ ] Use constant factor? Where is constant factor?
 
+- [ ] How to use sim3 in mapping
+- [ ] In localization, does the descriptor idea works?
+- [ ] CUrrent with the code we can only generate 3 states. How to generate 12 states? 
+
+- [ ] What kind of descriptor should be stored in the map?
+
 ### Progress
 - [x] Refactor 
 	- [x] trajectory_estimator 
@@ -280,11 +286,14 @@ https://blog.csdn.net/weixin_38256474/article/details/81228492
 - [x] Trajectory estimator use trajectory input instead of pose
 - [x] Add trajectory assert equal, for landmark projection and data_association
 
-- [ ] PR
+- [x] PR
 
 - [ ] add sim3 generator with points 
-- [ ] sim3 s Improvement
-- [ ] sim2 Unittest 
+- [x] sim3 s Improvement
+- [ ] sim3 unittest
+- [x] sim2 Unittest 
+	- [x] test 1 correct
+	- [x] test 2 wrong p2 should be (10,20) not (20,20)
 
 - [ ] Presentation
 - [ ] Collect New Data

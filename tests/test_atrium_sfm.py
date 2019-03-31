@@ -120,13 +120,11 @@ class TestAtriumSFMEample(unittest.TestCase):
 
         # Compare output poses with ground truth poses
         for i, pose in enumerate(actual_poses):
-            print(pose)
-            # self.assertGtsamEquals(pose, poses[i])
+            self.assertGtsamEquals(pose, poses[i])
 
         # Compare output points with ground truth points
         for i, point in enumerate(actual_points):
-            print(point)
-            # self.assertGtsamEquals(point, points[i])
+            self.assertGtsamEquals(point, points[i])
 
 
 if __name__ == "__main__":
