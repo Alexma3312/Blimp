@@ -46,7 +46,7 @@ class Similarity2(object):
         *************************************************************************
         It finds the angle using a linear method:
         q = Pose2::transform_from(p) = t + R*p
-        We need to remove the centroids from the data to find the rotation
+        Subtract the centroid from each point
 
         q1 = R*p1+t     -> (q1-c_q) = R * (p1-c_p) 
         c_q = R*c_p+t
@@ -120,9 +120,6 @@ class Similarity2(object):
         self._t = t
         self._s = scale
 
-    def map_transform(self):
-        return
-
 
 class TestSimilarity2(unittest.TestCase):
 
@@ -161,8 +158,8 @@ class TestSimilarity2(unittest.TestCase):
             raise self.failureException(
                 "Not equal:\n{}!={}".format(actual, expected))
 
-    def test_map_transform(self):
-        """Test similarity transform on a map."""
+    def test_transform(self):
+        """Test similarity transform on poses and points."""
         expected_poses, expected_points = self.d_map
 
         sim2 = Similarity2(Rot2(math.radians(90)), Point2(10, 10), 2)
@@ -177,24 +174,28 @@ class TestSimilarity2(unittest.TestCase):
 
     def test_align(self):
         """Test generating similarity transform with Point2 pairs."""
-        s_point1 = Point2(0.5, 0.5)
-        s_point2 = Point2(2, 0.5)
-
-        d_point1 = Point2(9, 11)
-        d_point2 = Point2(9, 14)
-
-        point_pairs = [[s_point1, d_point1], [s_point2, d_point2]]
-        sim2 = Similarity2()
-        sim2.align(point_pairs)
-
+        # Create expected sim2
         expected_R = Rot2(math.radians(90))
         expected_s = 2
         expected_t = Point2(10, 10)
 
+        # Create source points
+        s_point1 = Point2(0.5, 0.5)
+        s_point2 = Point2(2, 0.5)
+
+        # Create destination points
+        d_point1 = Point2(9, 11)
+        d_point2 = Point2(9, 14)
+
+        # Align
+        point_pairs = [[s_point1, d_point1], [s_point2, d_point2]]
+        sim2 = Similarity2()
+        sim2.align(point_pairs)
+
+        # Check actual sim2 equals to expected sim2
         expected_R.equals(sim2._R, 0.01)
         self.assertEqual(sim2._s, expected_s)
         self.assert_gtsam_equals(sim2._t, expected_t)
-
 
 if __name__ == "__main__":
     unittest.main()

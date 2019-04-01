@@ -1,10 +1,14 @@
+from sfm import sfm_data
 """This is a three dimensional Similarity Transformation module"""
 import math
 import unittest
+import sys
 
 import gtsam
 import numpy as np
 from gtsam import Point3, Pose3, Rot3
+
+sys.path.append("../")
 
 
 class Similarity3(object):
@@ -39,45 +43,81 @@ class Similarity3(object):
             self._R.rotate(pose.translation()).vector() + self._t.vector()
         return Pose3(R, Point3(translation))
 
-    def align_pose(self, pose_pairs):
-        """
-        Generate similarity transform with Pose3 pairs.
 
-        R:  Rs.T * Rd = R
 
-        s,t:
-          t = td_1 - s*R*ts_1
-          t = td_2 - s*R*ts_2
-          s*(R*d_ts) = d_td 
-        """
-        n = len(pose_pairs)
-        assert n >= 2  # we need at least two pairs
-
-        # calculate rotation matrix Rs.T * Rd = R
-        R = np.dot(pose_pairs[0][0].rotation().matrix().T,
-                   pose_pairs[0][1].rotation().matrix())
-
-        # calculate scale
-        d_ts = pose_pairs[0][0].translation().vector(
-        ) - pose_pairs[1][0].translation().vector()
-        d_td = pose_pairs[0][1].translation().vector(
-        ) - pose_pairs[1][1].translation().vector()
-        s = d_td[0]/np.dot(R, d_ts)[0]
-
-        # calculate translation
-        t = pose_pairs[0][1].translation().vector(
-        ) - s*np.dot(R, pose_pairs[0][0].translation().vector())
-
-        self._R = Rot3(R)
-        self._t = Point3(t)
-        self._s = s
-
+# unfinished
     def align_point(self, point_pairs):
         """
         Generate similarity transform with Point3 pairs.
         """
         n = len(point_pairs)
         assert n >= 3  # we need at least three pairs
+
+        # calculate centroids
+        s_center = Point3(0, 0, 0)
+        d_center = Point3(0, 0, 0)
+        for point_pair in point_pairs:
+            s_center = Point3(
+                s_center.x() + point_pair[0].x(), s_center.y() + point_pair[0].y(), s_center.z() + point_pair[0].z())
+            d_center = Point3(
+                d_center.x() + point_pair[1].x(), d_center.y() + point_pair[1].y(),d_center.z() + point_pair[1].z())
+        f = 1.0/n
+        s_center = Point3(s_center.x()*f, s_center.y()*f, s_center.z()*f)
+        d_center = Point3(d_center.x()*f, d_center.y()*f, d_center.z()*f)
+
+        # Add to form H matrix
+        H = np.zeros([3, 3])
+        for point_pair in point_pairs:
+            s_d = Point3(point_pair[0].x()-s_center.x(),
+                         point_pair[0].y()-s_center.y(),
+                         point_pair[0].z()-s_center.z())
+            d_d = Point3(point_pair[1].x()-d_center.x(),
+                         point_pair[1].y()-d_center.y(),
+                         point_pair[1].z()-d_center.z())
+            c += s_d.x() * d_d.x() + s_d.y() * d_d.y()
+            s += -s_d.y() * d_d.x() + s_d.x() * d_d.y()
+            H += s_d.x()*s_d.x() + s_d.y()*s_d.y()
+
+        # calculate angle, scale, and translation
+        theta = math.atan2(s, c)
+        R = Rot2.fromAngle(theta)
+        determinant = np.linalg.det(np.array([[c, -s], [s, c]]))
+        if(determinant >= 0):
+            scale = determinant**(1/2)
+        elif(determinant < 0):
+            scale = -(-determinant)**(1/2)
+
+        t = R.rotate(s_center)
+        t = Point2(d_center.x() - scale*t.x(), d_center.y() - scale*t.y())
+
+        self._R = R
+        self._t = t
+        self._s = scale
+
+    def map_transform(self, s_map):
+        """
+        Calculate the similarity transform of a Map, included Pose3 and Point3
+        Parameters:
+            s_map: source map, a two demension tuple include a list of Pose3 and a list of Point3 
+        Returns:
+            d_map: destination map, a two demension tuple include a list of Pose3 and a list of Point3
+        """
+        d_poses = []
+        d_points = []
+
+        # Transform all the poses in the map
+        for pose in s_map[0]:
+            pose = self.pose(pose)
+            d_poses.append(pose)
+
+        # Transform all the points in the map
+        for point in s_map[1]:
+            point = self.point(point)
+            d_points.append(point)
+
+        d_map = (d_poses, d_points)
+
+        return d_map
 
 
 class TestSimilarity2(unittest.TestCase):
@@ -123,8 +163,8 @@ class TestSimilarity2(unittest.TestCase):
             raise self.failureException(
                 "Not equal:\n{}!={}".format(actual, expected))
 
-    def test_map_transform(self):
-        """Test similarity transform on a map."""
+    def test_transform(self):
+        """Test similarity transform on poses and points."""
         expected_poses, expected_points = self.d_map
 
         sim3 = Similarity3(Rot3.Ry(math.radians(180)), Point3(4, 6, 10), 2)
@@ -138,31 +178,22 @@ class TestSimilarity2(unittest.TestCase):
             pose = sim3.pose(pose)
             self.assert_gtsam_equals(expected_poses[i], pose)
 
-    def test_align_pose(self):
-        """Test generating similarity transform with Pose3 pairs."""
-        s_pose1 = Pose3(
-            Rot3(np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])), Point3(0, 0, 0))
-        s_pose2 = Pose3(
-            Rot3(np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]])), Point3(4, 0, 0))
+    def test_map_transform(self):
+        """Test similarity transform on a map."""
+        expected_poses, expected_points = self.d_map
 
-        d_pose1 = Pose3(
-            Rot3(np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])), Point3(4, 6, 10))
-        d_pose2 = Pose3(
-            Rot3(np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])), Point3(-4, 6, 10))
+        sim3 = Similarity3(Rot3.Ry(math.radians(180)), Point3(4, 6, 10), 2)
+        actual_poses, actual_points = sim3.map_transform(self.s_map)
 
-        pose_pairs = [[s_pose1, d_pose1], [s_pose2, d_pose2]]
+        for i, point in enumerate(actual_points):
+            self.assert_gtsam_equals(expected_points[i], point)
 
-        sim3 = Similarity3()
-        sim3.align_pose(pose_pairs)
+        for i, pose in enumerate(actual_poses):
+            self.assert_gtsam_equals(expected_poses[i], pose)
 
-        expected_R = Rot3.Ry(math.radians(180))
-        expected_s = 2
-        expected_t = Point3(4, 6, 10)
 
-        expected_R.equals(sim3._R, 0.01)
-        self.assertEqual(sim3._s, expected_s)
-        self.assert_gtsam_equals(sim3._t, expected_t)
 
+    # Unfinished
     def test_align_point(self):
         """Test generating similarity transform with Point3 pairs."""
         s_point1 = Point3(1, 1, 0)
@@ -175,7 +206,6 @@ class TestSimilarity2(unittest.TestCase):
 
         point_pairs = [[s_point1, d_point1], [
             s_point2, d_point2], [s_point3, d_point3]]
-
 
 if __name__ == "__main__":
     unittest.main()
