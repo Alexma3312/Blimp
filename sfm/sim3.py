@@ -43,48 +43,7 @@ class Similarity3(object):
             self._R.rotate(pose.translation()).vector() + self._t.vector()
         return Pose3(R, Point3(translation))
 
-    def align_pose(self, pose_pairs):
-        """
-        Generate similarity transform with Pose3 pairs.
 
-        R:  R = Rd * Rs.T
-
-        s,t:
-          t = td_1 - s*R*ts_1 ,  d_ts = ts_1 - ts_2,
-          t = td_2 - s*R*ts_2    d_td = td_1 - td_2
-          Hence, s*(R*d_ts) = d_td
-          s = (/sum_i d_td_i) / (/sum_j (R*d_ts)_j) 
-        """
-        n = len(pose_pairs)
-        assert n >= 2  # we need at least two pairs
-
-        # calculate rotation matrix R = Rd * Rs.T
-        R = np.dot(pose_pairs[0][1].rotation().matrix(),pose_pairs[0][0].rotation().matrix().T)
-
-        # calculate scale with least square
-        d_ts = pose_pairs[0][0].translation().vector(
-        ) - pose_pairs[1][0].translation().vector()
-        d_td = pose_pairs[0][1].translation().vector(
-        ) - pose_pairs[1][1].translation().vector()
-
-        s1 = s2 = n = 0
-
-        # Cited from https://docs.scipy.org/doc/numpy/reference/generated/numpy.linalg.lstsq.html
-        # We can rewrite the line equation as y = Ap, where A = [[x 1]] and p = [[m], [c]].
-        # Now use lstsq to solve for p:
-        x = np.append(np.dot(R, d_ts), [0], axis=0)
-        y = np.append(d_td, [0], axis=0)
-        A = np.vstack([x, np.ones(len(x))]).T
-        m, c = np.linalg.lstsq(A, y, rcond=-1)[0]
-        s = m
-
-        # calculate translation
-        t = pose_pairs[0][1].translation().vector(
-        ) - s*np.dot(R, pose_pairs[0][0].translation().vector())
-
-        self._R = Rot3(R)
-        self._t = Point3(t)
-        self._s = s
 
 # unfinished
     def align_point(self, point_pairs):
@@ -232,34 +191,7 @@ class TestSimilarity2(unittest.TestCase):
         for i, pose in enumerate(actual_poses):
             self.assert_gtsam_equals(expected_poses[i], pose)
 
-    def test_align_pose(self):
-        """Test generating similarity transform with Pose3 pairs."""
-        # Create expected sim3
-        expected_R = Rot3.Ry(math.radians(180))
-        expected_s = 2
-        expected_t = Point3(4, 6, 10)
 
-        # Create source poses
-        s_pose1 = Pose3(
-            Rot3(np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])), Point3(0, 0, 0))
-        s_pose2 = Pose3(
-            Rot3(np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]])), Point3(4, 0, 0))
-
-        # Create destination poses
-        d_pose1 = Pose3(
-            Rot3(np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])), Point3(4, 6, 10))
-        d_pose2 = Pose3(
-            Rot3(np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])), Point3(-4, 6, 10))
-
-        # Align
-        pose_pairs = [[s_pose1, d_pose1], [s_pose2, d_pose2]]
-        sim3 = Similarity3()
-        sim3.align_pose(pose_pairs)
-
-        # Check actual sim3 equals to expected sim3
-        expected_R.equals(sim3._R, 0.01)
-        self.assertAlmostEqual(sim3._s, expected_s, delta=0.01)
-        self.assert_gtsam_equals(sim3._t, expected_t)
 
     # Unfinished
     def test_align_point(self):
