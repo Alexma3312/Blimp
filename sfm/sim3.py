@@ -47,7 +47,6 @@ class Similarity3(object):
         """
         Generate similarity transform with Pose3 pairs.
 
-        R:  Rs.T * Rd = R
         R:  R = Rd * Rs.T
 
         s,t:
@@ -59,9 +58,7 @@ class Similarity3(object):
         n = len(pose_pairs)
         assert n >= 2  # we need at least two pairs
 
-        # calculate rotation matrix Rs.T * Rd = R
-        # R = np.dot(pose_pairs[0][0].rotation().matrix().T,
-        #            pose_pairs[0][1].rotation().matrix())
+        # calculate rotation matrix R = Rd * Rs.T
         R = np.dot(pose_pairs[0][1].rotation().matrix(),pose_pairs[0][0].rotation().matrix().T)
 
         # calculate scale with least square
