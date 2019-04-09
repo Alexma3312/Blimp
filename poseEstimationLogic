@@ -1,7 +1,21 @@
 "This file contains the logic required for detecting the pose."
+
 Data coming in:
 - use a list with 3 pieces of information: the id (as a string), the coordinates (as a dictionary), the time state
 - coordinates of different parts - as a dictionary
 - time state
 
 - data is coming in from 2 cameras: use a string "cam1" and "cam2" to serve as their id. 
+
+- this data will be stored by the buffer
+
+- Logic for checking if hand is being pointed at the camera:
+--> if hand coordinates == shoulder coordinates --> hand is going up probably
+--> if hand coordinates > shoulder coordinates and == head coordinates --> hand is going up progressively
+--> for a certain defined number of time states, if the hand coordinates > head coordinates --> means hand is up --> 
+At this point, we transmit info about the person's location (using triangulation) to the main module, which transfers that 
+information to the blimp's module via the POST method 
+
+
+
+
