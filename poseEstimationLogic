@@ -1,1 +1,7 @@
+"This file contains the logic required for detecting the pose."
+Data coming in:
+- use a list with 3 pieces of information: the id (as a string), the coordinates (as a dictionary), the time state
+- coordinates of different parts - as a dictionary
+- time state
 
+- data is coming in from 2 cameras: use a string "cam1" and "cam2" to serve as their id. 
