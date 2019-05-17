@@ -1,7 +1,13 @@
+"""
+Unit tests for MappingFrontEnd
+"""
+# pylint: disable=invalid-name, no-name-in-module, no-member
+
 import unittest
-import gtsam
-from gtsam import Point2, Point3, Pose3, Rot3, symbol
-from feature_matcher.mapping import *
+
+from gtsam import Point3, Pose3, Rot3
+
+from mapping import MappingFrontEnd, X, P
 
 
 def load_points():
@@ -12,19 +18,20 @@ def load_points():
         num_pts = int(pts[0].strip())
         for i in range(num_pts):
             pt = [float(x) for x in pts[i+1].strip().split()]
-            pts3d.append(gtsam.Point3(*pt))
+            pts3d.append(Point3(*pt))
     return pts3d
 
 
 class TestMapping(unittest.TestCase):
-    def setUp(self):
-        fe = MappingFrontEnd()
-        fe.get_all_image_features()
-        fe.get_feature_matches()
-        fe.initial_estimation()
+    """Unit tests for mapping."""
 
-        self.sfm_result, _, _ = fe.bundle_adjustment()
-        # fe.plot_sfm_result(self.sfm_result)
+    def setUp(self):
+        """Create mapping front-end and read csv file."""
+        data_directory = 'feature_matcher/sim_match_data/'
+        front_end = MappingFrontEnd(data_directory)
+
+        self.sfm_result, _, _ = front_end.bundle_adjustment()
+        # front_end.plot_sfm_result(self.sfm_result)
 
     def assert_gtsam_equals(self, actual, expected, tol=1e-6):
         """Helper function that prints out actual and expected if not equal."""
@@ -51,7 +58,7 @@ class TestMapping(unittest.TestCase):
         for i, expected_point_i in enumerate(expected_points):
             actual_point_i = self.sfm_result.atPoint3(P(i))
             # print(actual_point_i,expected_point_i)
-            self.assert_gtsam_equals(actual_point_i, expected_point_i,1e-4)
+            self.assert_gtsam_equals(actual_point_i, expected_point_i, 1e-4)
 
 
 if __name__ == "__main__":
