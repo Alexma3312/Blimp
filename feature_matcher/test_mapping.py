@@ -51,7 +51,7 @@ class TestMapping(unittest.TestCase):
         for i, expected_point_i in enumerate(expected_points):
             actual_point_i = self.sfm_result.atPoint3(P(i))
             # print(actual_point_i,expected_point_i)
-            self.assert_gtsam_equals(actual_point_i, expected_point_i, 1.7)
+            self.assert_gtsam_equals(actual_point_i, expected_point_i,1e-4)
 
 
 if __name__ == "__main__":

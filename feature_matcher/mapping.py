@@ -96,7 +96,7 @@ class MappingFrontEnd(object):
         self.basedir = data_directory
         self.nrframes = num_frames
 
-        fov,  w, h = 75, 1280, 720
+        fov,  w, h = 60, 1280, 720
         self.cal = gtsam.Cal3_S2(fov, w, h)
         self.calibration = self.cal.matrix()
 
@@ -262,13 +262,13 @@ class MappingFrontEnd(object):
                     if(self.landmark[landmark_id].seen >= MIN_LANDMARK_SEEN):
                         key_point = Point2(
                             img_pose.kp[k][0], img_pose.kp[k][1])
-                        # Filter valid landmarks
+                        # Filter invalid landmarks
                         if landmark_id_list.get(landmark_id) == None:
                             pose = Pose3(wRc, Point3(0, self.delta_z*i, 2))
                             landmark_point = self.back_projection(
                                 key_point, pose, depth)
                             landmark_id_list[landmark_id] = landmark_point
-                        # Filter valid image poses
+                        # Filter invalid image poses
                         if img_pose_id_list.get(i) == None:
                             img_pose_id_list[i] = True
                         graph.add(gtsam.GenericProjectionFactorCal3_S2(
