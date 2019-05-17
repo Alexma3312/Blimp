@@ -162,19 +162,16 @@ class MappingFrontEnd(object):
         And estimate pose and landmark.
         """
         for i in range(len(self.img_pose)-1):
-
+            # Get keypoints and keypoint indices
             src = np.array([], dtype=np.float).reshape(0, 2)
             dst = np.array([], dtype=np.float).reshape(0, 2)
             kp_src_idx = []
             kp_dst_idx = []
-
             for k in self.img_pose[i].kp_matches:
                 if self.img_pose[i].kp_match_exist(k, i+1):
                     k = int(k)
-
                     match_idx = self.img_pose[i].kp_match_idx(k, i+1)
                     match_idx = int(match_idx)
-
                     src = np.vstack((src, self.img_pose[i].kp[k]))
                     dst = np.vstack((dst, self.img_pose[i+1].kp[match_idx]))
                     kp_dst_idx.append(match_idx)
@@ -185,6 +182,7 @@ class MappingFrontEnd(object):
                       i, " and image_", i+1)
                 continue
 
+            # Initial estimate pose and landmark
             src = np.expand_dims(src, axis=1)
             dst = np.expand_dims(dst, axis=1)
             # E, mask = cv2.findEssentialMat(dst,src,cameraMatrix = self.calibration,method =cv2.LMEDS,prob=0.999)
@@ -215,15 +213,10 @@ class MappingFrontEnd(object):
             for j, k in enumerate(kp_src_idx):
                 if(mask[j]):
                     match_idx = self.img_pose[i].kp_match_idx(k, i+1)
-
                     if (self.img_pose[i].kp_3d_exist(k)):
-                        self.img_pose[i +
-                                      1].kp_landmark[match_idx] = self.img_pose[i].kp_3d(k)
-                        self.landmark[self.img_pose[i].kp_3d(
-                            k)].point += pt3d[j]
-                        self.landmark[self.img_pose[i +
-                                                    1].kp_3d(match_idx)].seen += 1
-
+                        self.img_pose[i +1].kp_landmark[match_idx] = self.img_pose[i].kp_3d(k)
+                        self.landmark[self.img_pose[i].kp_3d(k)].point += pt3d[j]
+                        self.landmark[self.img_pose[i+1].kp_3d(match_idx)].seen += 1
                     else:
                         new_landmark = LandMark(pt3d[j], 2)
                         self.landmark.append(new_landmark)
