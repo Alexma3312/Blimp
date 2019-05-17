@@ -92,7 +92,7 @@ class LandMark(object):
 
 
 class MappingFrontEnd(object):
-    def __init__(self, data_directory='feature_matcher/sim_match_data/', num_frames=3):
+    def __init__(self, data_directory='feature_matcher/sim_match_data/', num_frames=3, delta_z=1):
         self.basedir = data_directory
         self.nrframes = num_frames
 
@@ -100,9 +100,11 @@ class MappingFrontEnd(object):
         self.cal = gtsam.Cal3_S2(fov, w, h)
         self.calibration = self.cal.matrix()
 
+        # Pose distance along z axis
         fps = 30
         velocity = 10  # m/s
-        self.delta_z = velocity / fps
+        # self.delta_z = velocity / fps
+        self.delta_z = delta_z
 
         self.img_pose = []
         self.landmark = []
@@ -152,12 +154,12 @@ class MappingFrontEnd(object):
                 self.img_pose[i+1].kp_matches[match[3]][i] = match[1]
 
                 good_match_count += 1
-            print("Feature matching ", i, " ", i+1, " ==> ", len(matches))
+            # print("Feature matching ", i, " ", i+1, " ==> ", len(matches))
 
     def initial_estimation(self):
         """
         Find feature data association across all images incrementally.  
-        Currently is data association but it can be developed into pose and landmark initial estimation.
+        And estimate pose and landmark.
         """
         for i in range(len(self.img_pose)-1):
 
@@ -187,12 +189,12 @@ class MappingFrontEnd(object):
             dst = np.expand_dims(dst, axis=1)
             # E, mask = cv2.findEssentialMat(dst,src,cameraMatrix = self.calibration,method =cv2.LMEDS,prob=0.999)
             E, mask = cv2.findEssentialMat(
-                dst, src, cameraMatrix=self.calibration, method=cv2.RANSAC, prob=0.999, threshold=1)
+                dst, src, cameraMatrix=self.calibration, method=cv2.RANSAC, prob=0.9, threshold=3)
 
-            _, local_R, local_t, mask = cv2.recoverPose(
-                E, dst, src, cameraMatrix=self.calibration, mask=mask)
-            print(local_R)
-            print(local_t)
+            _, local_R, local_t, _ = cv2.recoverPose(
+                E, dst, src, cameraMatrix=self.calibration)
+            # print("R=",local_R)
+            # print("t=",local_t)
 
             T = Pose3(Rot3(local_R), Point3(
                 local_t[0], local_t[1], local_t[2]))
@@ -211,23 +213,25 @@ class MappingFrontEnd(object):
 
             # Find good triangulated points
             for j, k in enumerate(kp_src_idx):
-                # if(mask[j]):
-                match_idx = self.img_pose[i].kp_match_idx(k, i+1)
+                if(mask[j]):
+                    match_idx = self.img_pose[i].kp_match_idx(k, i+1)
 
-                if (self.img_pose[i].kp_3d_exist(k)):
-                    self.img_pose[i +
-                                  1].kp_landmark[match_idx] = self.img_pose[i].kp_3d(k)
-                    self.landmark[self.img_pose[i].kp_3d(k)].point += pt3d[j]
-                    self.landmark[self.img_pose[i +
-                                                1].kp_3d(match_idx)].seen += 1
+                    if (self.img_pose[i].kp_3d_exist(k)):
+                        self.img_pose[i +
+                                      1].kp_landmark[match_idx] = self.img_pose[i].kp_3d(k)
+                        self.landmark[self.img_pose[i].kp_3d(
+                            k)].point += pt3d[j]
+                        self.landmark[self.img_pose[i +
+                                                    1].kp_3d(match_idx)].seen += 1
 
-                else:
-                    new_landmark = LandMark(pt3d[j], 2)
-                    self.landmark.append(new_landmark)
+                    else:
+                        new_landmark = LandMark(pt3d[j], 2)
+                        self.landmark.append(new_landmark)
 
-                    self.img_pose[i].kp_landmark[k] = len(self.landmark) - 1
-                    self.img_pose[i +
-                                  1].kp_landmark[match_idx] = len(self.landmark) - 1
+                        self.img_pose[i].kp_landmark[k] = len(
+                            self.landmark) - 1
+                        self.img_pose[i +
+                                      1].kp_landmark[match_idx] = len(self.landmark) - 1
 
         for j in range(len(self.landmark)):
             if(self.landmark[j].seen >= 3):
@@ -242,10 +246,10 @@ class MappingFrontEnd(object):
         return pose.transform_from(ph)
 
     def bundle_adjustment(self):
-        
-        MIN_LANDMARK_SEEN = 3 # minimal number of corresponding keypoints to recover a landmarks 
-        wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0) # camera to world rotation
-        depth = 20 # Back projection depth
+
+        MIN_LANDMARK_SEEN = 3  # minimal number of corresponding keypoints to recover a landmarks
+        wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # camera to world rotation
+        depth = 20  # Back projection depth
 
         # Initialize factor Graph
         graph = gtsam.NonlinearFactorGraph()
@@ -289,8 +293,9 @@ class MappingFrontEnd(object):
                 wRc, Point3(0, self.delta_z*idx, 2))
             initialEstimate.insert(X(idx), pose_i)
             # Create priors for poses
-            if(idx == 0 or idx ==1):
-                graph.add(gtsam.PriorFactorPose3(X(idx), pose_i, posePriorNoise))
+            if(idx == 0 or idx == 1):
+                graph.add(gtsam.PriorFactorPose3(
+                    X(idx), pose_i, posePriorNoise))
             # Create priors for all poses
             # graph.add(gtsam.PriorFactorPose3(X(idx), pose_i, posePriorNoise))
 
@@ -342,7 +347,7 @@ def run():
     tic_ba = time.time()
     sfm_result, nrCamera, nrPoint = fe.bundle_adjustment()
     toc_ba = time.time()
-    print(sfm_result)
+    # print(sfm_result)
     print('BA spents ', toc_ba-tic_ba, 's')
     fe.plot_sfm_result(sfm_result)
 
