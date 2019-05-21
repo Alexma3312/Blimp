@@ -1,7 +1,7 @@
 import unittest
 import gtsam
 from gtsam import Point2, Point3, Pose3, Rot3, symbol
-from feature_matcher.mapping import *
+from mapping import *
 
 
 def load_points():

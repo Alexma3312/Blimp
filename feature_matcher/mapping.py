@@ -11,7 +11,7 @@ from mpl_toolkits.mplot3d import Axes3D
 
 import gtsam
 import gtsam.utils.plot as gtsam_plot
-from feature_matcher.parser import get_matches, load_features
+from parser import get_matches, load_features
 from gtsam import Point2, Point3, Pose3, Rot3, symbol
 
 
