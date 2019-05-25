@@ -1,6 +1,8 @@
 """
 A Mapping Pipeline: feature match info parser, data association, and Bundle Adjustment(gtsam).
 """
+# pylint: disable=invalid-name, no-name-in-module, no-member
+
 import os
 import time
 
@@ -50,7 +52,7 @@ class ImagePose(object):
         self._descriptors = descriptors
         self._keypoints = keypoints
 
-        # Initialize a dictionary to manage matching information between 
+        # Initialize a dictionary to manage matching information between
         # current frame keypoints indices and keypoints in other frames
         self.kp_matches = {}
 
