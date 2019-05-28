@@ -1,13 +1,13 @@
+# cSpell: disable=invalid-name
 """
-Unit tests for MappingFrontEnd
+Unit tests for MappingBackEnd
 """
 # pylint: disable=invalid-name, no-name-in-module, no-member
 
 import unittest
 
 from gtsam import Point3, Pose3, Rot3
-
-from mapping import MappingFrontEnd, X, P
+from feature_matcher.mapping_03 import MappingBackEnd, P, X
 
 
 def load_points():
@@ -26,12 +26,12 @@ class TestMapping(unittest.TestCase):
     """Unit tests for mapping."""
 
     def setUp(self):
-        """Create mapping front-end and read csv file."""
+        """Create mapping Back-end and read csv file."""
         data_directory = 'feature_matcher/sim_match_data/'
-        front_end = MappingFrontEnd(data_directory)
+        back_end = MappingBackEnd(data_directory)
 
-        self.sfm_result, _, _ = front_end.bundle_adjustment()
-        # front_end.plot_sfm_result(self.sfm_result)
+        self.sfm_result, _, _ = back_end.bundle_adjustment()
+        # back_end.plot_sfm_result(self.sfm_result)
 
     def assert_gtsam_equals(self, actual, expected, tol=1e-6):
         """Helper function that prints out actual and expected if not equal."""
@@ -56,7 +56,7 @@ class TestMapping(unittest.TestCase):
         """Test landmark output"""
         expected_points = load_points()
         for i, expected_point_i in enumerate(expected_points):
-            actual_point_i = self.sfm_result.atPoint3(P(i))
+            actual_point_i = self.sfm_result.atPoint3(P(i+1))
             # print(actual_point_i,expected_point_i)
             self.assert_gtsam_equals(actual_point_i, expected_point_i, 1e-4)
 
