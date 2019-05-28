@@ -227,8 +227,8 @@ class MappingBackEnd(object):
 
             _, local_R, local_t, _ = cv2.recoverPose(
                 E, dst, src, cameraMatrix=self._calibration.matrix())
-            print("R=", local_R)
-            print("t=", local_t)
+            # print("R=", local_R)
+            # print("t=", local_t)
 
             T = Pose3(Rot3(local_R), Point3(
                 local_t[0], local_t[1], local_t[2]))
@@ -427,29 +427,31 @@ class MappingBackEnd(object):
 
         return sfm_result, img_pose_id_list, landmark_id_list
 
-    def plot_sfm_result(self, result):
-        """
-        Plot mapping result.
-        """
-        # Declare an id for the figure
-        _fignum = 0
-        fig = plt.figure(_fignum)
-        axes = fig.gca(projection='3d')
-        plt.cla()
-        # Plot points
-        gtsam_plot.plot_3d_points(_fignum, result, 'rx')
-        # Plot cameras
-        i = 0
-        while result.exists(X(i)):
-            pose_i = result.atPose3(X(i))
-            gtsam_plot.plot_pose3(_fignum, pose_i, 1)
-            i += 1
-        # Draw
-        axes.set_xlim3d(-20, 20)
-        axes.set_ylim3d(-20, 20)
-        axes.set_zlim3d(-20, 20)
-        plt.legend()
-        plt.show()
+
+def plot_sfm_result(result, poses, points):
+    """
+    Plot mapping result.
+    """
+    # Declare an id for the figure
+    _fignum = 0
+    fig = plt.figure(_fignum)
+    axes = fig.gca(projection='3d')
+    plt.cla()
+    # Plot points
+    # gtsam_plot.plot_3d_points(_fignum, result, 'rx')
+    for idx in points:
+        point_i = result.atPoint3(P(idx))
+        gtsam_plot.plot_point3(_fignum, point_i, 'rx')
+    # Plot cameras
+    for idx in poses:
+        pose_i = result.atPose3(X(idx))
+        gtsam_plot.plot_pose3(_fignum, pose_i, 1)
+    # Draw
+    axes.set_xlim3d(-20, 20)
+    axes.set_ylim3d(-20, 20)
+    axes.set_zlim3d(-20, 20)
+    plt.legend()
+    plt.show()
 
 
 def run():
@@ -458,10 +460,10 @@ def run():
     # print(back_end._feature_matches[1].kp_matches)
     back_end.data_association()
     tic_ba = time.time()
-    sfm_result, _, _ = back_end.bundle_adjustment()
+    sfm_result, poses, points = back_end.bundle_adjustment()
     toc_ba = time.time()
     print('BA spents ', toc_ba-tic_ba, 's')
-    back_end.plot_sfm_result(sfm_result)
+    plot_sfm_result(sfm_result, poses, points)
 
 
 if __name__ == "__main__":
