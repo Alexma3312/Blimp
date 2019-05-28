@@ -334,7 +334,7 @@ class MappingBackEnd(object):
             self._image_features
             self._image_points
         Output:
-            result-
+            result - gtsam optimzation result
         """
         MIN_LANDMARK_SEEN = 3  # minimal number of corresponding keypoints to recover a landmarks
         wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # camera to world rotation
@@ -353,56 +353,36 @@ class MappingBackEnd(object):
         poseNoiseSigmas = np.array([s, s, s, 1, 1, 1])
         posePriorNoise = gtsam.noiseModel_Diagonal.Sigmas(poseNoiseSigmas)
 
-        landmark_id_list = {}
-        img_pose_id_list = {}
+        # Create dictionary for initial estimation
+        landmark_id_dict = {}
+        img_pose_id_dict = {}
         for img_idx, features in enumerate(self._image_features):
-            for kp_idx in range(len(features.keypoints)):
+            for kp_idx, keypoint in enumerate(features.keypoints):
                 if self.image_points[img_idx].kp_3d_exist(kp_idx):
                     landmark_id = self.image_points[img_idx].kp_3d(kp_idx)
                     if self.landmark[landmark_id].seen >= MIN_LANDMARK_SEEN:
-                        key_point = Point2(
-                            features.keypoints[kp_idx][0], features.keypoints[kp_idx][1])
+                        key_point = Point2(keypoint[0], keypoint[1])
                         # Filter invalid landmarks
-                        if landmark_id_list.get(landmark_id) is None:
+                        if landmark_id_dict.get(landmark_id) is None:
                             pose = Pose3(wRc, Point3(
                                 0, self.delta_z*img_idx, 2))
                             landmark_3d_point = self.back_projection(
                                 key_point, pose, depth)
-                            landmark_id_list[landmark_id] = landmark_3d_point
+                            landmark_id_dict[landmark_id] = landmark_3d_point
                         # Filter invalid image poses
-                        if img_pose_id_list.get(img_idx) is None:
-                            img_pose_id_list[img_idx] = True
+                        if img_pose_id_dict.get(img_idx) is None:
+                            img_pose_id_dict[img_idx] = True
+                        # Create Projection Factor
                         graph.add(gtsam.GenericProjectionFactorCal3_S2(
                             key_point, measurementNoise,
                             X(img_idx), P(landmark_id), self._calibration))
-        # def find_correspondences(img_idx, features, kp_idx):
-        #     if self.image_points[img_idx].kp_3d_exist(kp_idx):
-        #         landmark_id = self.image_points[img_idx].kp_3d(kp_idx)
-        #         if self.landmark[landmark_id].seen >= MIN_LANDMARK_SEEN:
-        #             key_point = Point2(
-        #                 features.keypoints[kp_idx][0], features.keypoints[kp_idx][1])
-        #             # Filter invalid landmarks
-        #             if landmark_id_list.get(landmark_id) is None:
-        #                 pose = Pose3(wRc, Point3(0, self.delta_z*img_idx, 2))
-        #                 landmark_3d_point = self.back_projection(
-        #                     key_point, pose, depth)
-        #                 landmark_id_list[landmark_id] = landmark_3d_point
-        #             # Get  image poses
-        #             if img_pose_id_list.get(img_idx) is None:
-        #                 img_pose_id_list[img_idx] = True
-        #             graph.add(gtsam.GenericProjectionFactorCal3_S2(
-        #                 key_point, measurementNoise,
-        #                 X(img_idx), P(landmark_id), self._calibration))
-        #     return landmark_id_list, img_pose_id_list
-
-        # find_correspondences(i, features, k, landmark_id_list, img_pose_id_list) for i, features in enumerate(self._image_features) for k in range(len(features.keypoints))
 
         # Initial estimate for poses
-        for idx in img_pose_id_list:
+        for idx in img_pose_id_dict:
             pose_i = Pose3(
                 wRc, Point3(0, self.delta_z*idx, 2))
             initialEstimate.insert(X(idx), pose_i)
-            # Create priors for poses
+            # Create priors for first two poses
             if idx in (0, 1):
                 graph.add(gtsam.PriorFactorPose3(
                     X(idx), pose_i, posePriorNoise))
@@ -410,8 +390,8 @@ class MappingBackEnd(object):
             # graph.add(gtsam.PriorFactorPose3(X(idx), pose_i, posePriorNoise))
 
         # Initialize estimation for landmarks
-        for idx in landmark_id_list:
-            point_j = landmark_id_list.get(idx)
+        for idx in landmark_id_dict:
+            point_j = landmark_id_dict.get(idx)
             initialEstimate.insert(P(idx), point_j)
 
         # Optimization
@@ -420,12 +400,12 @@ class MappingBackEnd(object):
 
         # Marginalization
         marginals = gtsam.Marginals(graph, sfm_result)
-        for idx in img_pose_id_list:
+        for idx in img_pose_id_dict:
             marginals.marginalCovariance(X(idx))
-        for idx in landmark_id_list:
+        for idx in landmark_id_dict:
             marginals.marginalCovariance(P(idx))
 
-        return sfm_result, img_pose_id_list, landmark_id_list
+        return sfm_result, img_pose_id_dict, landmark_id_dict
 
 
 def plot_sfm_result(result, poses, points):
@@ -457,12 +437,13 @@ def plot_sfm_result(result, poses, points):
 def run():
     """Execution."""
     back_end = MappingBackEnd('feature_matcher/sim_match_data/')
-    # print(back_end._feature_matches[1].kp_matches)
     back_end.data_association()
+    # Bundle Adjustment
     tic_ba = time.time()
     sfm_result, poses, points = back_end.bundle_adjustment()
     toc_ba = time.time()
     print('BA spents ', toc_ba-tic_ba, 's')
+    # Plot
     plot_sfm_result(sfm_result, poses, points)
 
 
