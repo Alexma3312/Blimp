@@ -1,16 +1,14 @@
 """
 Mapping based on Structure from Motion (SfM) with GTSAM
 """
-import math
 import sys
-import unittest
 
 import gtsam
 import numpy as np
-from gtsam import Point2, Point3, Pose3, symbol
+from gtsam import Point2, Point3, Pose3
 
 sys.path.append('../')
-from sfm import sfm_data
+
 
 def X(i):
     """Create key for pose i."""
@@ -22,7 +20,7 @@ def P(j):
     return gtsam.symbol(ord('p'), j)
 
 
-class AtriumSfm(object):
+class SfM(object):
     """
     Structure from Motion with GTSAM
     """
@@ -32,25 +30,23 @@ class AtriumSfm(object):
         Parameters:
             nrCameras -- Number of cameras
             nrPoints -- Number of landmarks 
-            fov_in_degrees -- Horizontal FOV = 128, Vertical FOV = 91, Diagonal FOV = 160
-            image_width, image_height -- Note: camera output image [640,480], Superpoint output image [160,120]
+            fov_in_degrees -- Based on the official document of Runcam Swift 2: horizontal FOV = 128, Vertical FOV = 91, Diagonal FOV = 160
+            image_width, image_height -- camera output image [640,480]. Superpoint can extract features with downsampled images, therefore the output of Superpoint is flexible.
         """
         self.nrCameras = nrCameras
         self.nrPoints = nrPoints
         self.calibration = gtsam.Cal3_S2(
             fov_in_degrees, image_width, image_height)
-        self.truth = []
 
     def back_project(self, feature_point, calibration, depth):
         """back-project to 3D point at given depth, in camera coordinates."""
         pn = self.calibration.calibrate(feature_point)  # normalized
         return gtsam.Point3(depth, depth*(pn.x()), 1.5-(pn.y())*depth)
 
-    def atrium_sfm(self, data, rot_angle, y_distance, rotation_error, translation_error):
-        """ Use GTSAM to solve Structure from Motion.
+    def bundle_adjustment(self, data, y_distance, rotation_error, translation_error):
+        """ Use GTSAM to solve Structure from Motion bundle adjustment.
         Parameters:
-            data -- a Data Object, input feature point data from the SFMdata.py file 
-            rot_angle -- degree, camera rotation angle in the x-z camera coordinate
+            data -- a Data Object, input feature point data from the sfm_data.py file 
             y_distance -- distances between two continuous poses along the y axis 
             rotation_error - pose prior rotation error
             translation_error - pose prior translation error
@@ -77,20 +73,15 @@ class AtriumSfm(object):
         poseNoiseSigmas = np.array([s, s, s, 10, 10, 10])
         posePriorNoise = gtsam.noiseModel_Diagonal.Sigmas(poseNoiseSigmas)
 
-        for i, y in enumerate([-1, 0, 1]):
-            # Consider camera rotation when creating Rot3
-            theta = np.radians(-y*rot_angle)
-            wRc = gtsam.Rot3(np.array([[0, math.cos(
-                theta), -math.sin(theta)], [0, -math.sin(theta), -math.cos(theta)], [1, 0, 0]]).T)
+        for i, y in enumerate([0, y_distance, 2*y_distance]):
             # Do not consider camera rotation when creating Rot3
-            # wRc = gtsam.Rot3(np.array([[0, 1, 0], [0, 0, -1], [1, 0, 0]]).T)
+            wRc = gtsam.Rot3(np.array([[0, 1, 0], [0, 0, -1], [1, 0, 0]]).T)
 
-            # The approximate height measurement is 1.5, the approximate y distance is 2.5
-            wTi = gtsam.Pose3(wRc, gtsam.Point3(0, (y+1)*y_distance, 1.5))
-
+            # The approximate height measurement is 1.5
+            wTi = gtsam.Pose3(wRc, gtsam.Point3(0, y, 1.5))
             initialEstimate.insert(X(i), wTi)
 
-        # Add prior for two poses
+        # Add priors for two poses
         # Add the first pose prior with error to test similarity transform.
         graph.add(gtsam.PriorFactorPose3(X(0), gtsam.Pose3(
             gtsam.Rot3(np.array([[0+rotation_error, 1+rotation_error, 0+rotation_error], [0+rotation_error, 0+rotation_error, -1+rotation_error], [1+rotation_error, 0+rotation_error, 0+rotation_error]]).T), gtsam.Point3(0+translation_error, 0+translation_error, 1.5+translation_error)), posePriorNoise))
@@ -99,7 +90,7 @@ class AtriumSfm(object):
 
         # Add initial estimates for Points.
         for j in range(self.nrPoints):
-            # Generate initial estimates by back projecting feature points collected at the initial pose
+            # Generate initial estimates by back projecting key points extracted at the initial pose. The scale is set based on experience.
             point_j = self.back_project(
                 data.Z[0][j], self.calibration, 15)
             initialEstimate.insert(P(j), point_j)
@@ -110,25 +101,5 @@ class AtriumSfm(object):
 
         # Marginalization
         marginals = gtsam.Marginals(graph, result)
-        marginals.marginalCovariance(X(0))
 
         return result
-
-
-if __name__ == '__main__':
-    # Initial the number of landmark points and cameras
-    nrCameras = 3
-    nrPoints = 5
-
-    # Create camera output image [640,480]
-    atriumSfm = AtriumSfm(nrCameras, nrPoints, 128, 640, 480)
-
-    # Initialize data
-    data = sfm_data.Data(nrCameras, nrPoints)
-    # Generate Structure from Motion input data
-    data.generate_data(2)
-
-    # Calculate Structure from Motion
-    result = atriumSfm.atrium_sfm(data, 0, 2.2, 0, 0)
-
-    print(result)

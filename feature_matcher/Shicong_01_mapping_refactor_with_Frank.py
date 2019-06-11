@@ -162,7 +162,7 @@ class MappingBackEnd(object):
         self._image_features = [get_image_features(
             image_index) for image_index in range(self.nrimages)]
         self._image_matches = self.create_image_matches()
-        self.image_points, self.landmark, self.image_poses = self.data_association()
+        self.image_points, self._landmark_estimates, self.image_poses = self.data_association()
 
     def create_image_matches(self):
         """
@@ -327,6 +327,51 @@ class MappingBackEnd(object):
         # Transfer the point into the world coordinate
         return pose.transform_from(ph)
 
+    def create_index_sets(self):
+        """Create two sets with valid pose and point indices."""
+        point_indices = set()
+        pose_indices = set()
+        for img_idx, features in enumerate(self._image_features):
+            for kp_idx, _ in enumerate(features.keypoints):
+                if self.image_points[img_idx].kp_3d_exist(kp_idx):
+                    landmark_id = self.image_points[img_idx].kp_3d(kp_idx)
+                    if self._landmark_estimates[landmark_id].seen >= self._min_landmark_seen:
+                        # Filter invalid landmarks
+                        point_indices.add(landmark_id)
+                        # Filter invalid image poses
+                        pose_indices.add(img_idx)
+
+        return pose_indices, point_indices
+
+    def create_initial_estimate(self, pose_indices):
+        """Create initial estimate from ???."""
+        wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # camera to world rotation
+        depth = 20
+
+        initial_estimate = gtsam.Values()
+
+        # Create dictionary for initial estimation
+        for img_idx, features in enumerate(self._image_features):
+            for kp_idx, keypoint in enumerate(features.keypoints):
+                if self.image_points[img_idx].kp_3d_exist(kp_idx):
+                    landmark_id = self.image_points[img_idx].kp_3d(kp_idx)
+                    # Filter invalid landmarks
+                    if self._landmark_estimates[landmark_id].seen >= self._min_landmark_seen:
+                        key_point = Point2(keypoint[0], keypoint[1])
+                        key = P(landmark_id)
+                        if not initial_estimate.exists(key):
+                            # do back-projection
+                            pose = Pose3(wRc, Point3(0, self.delta_z*img_idx, 2))
+                            landmark_3d_point = self.back_projection(key_point, pose, depth)
+                            initial_estimate.insert(P(landmark_id), landmark_3d_point)
+
+        # Initial estimate for poses
+        for idx in pose_indices:
+            pose_i = Pose3(wRc, Point3(0, self.delta_z*idx, 2))
+            initial_estimate.insert(X(idx), pose_i)
+
+        return initial_estimate
+
     def bundle_adjustment(self):
         """
         Bundle Adjustment.
@@ -336,79 +381,43 @@ class MappingBackEnd(object):
         Output:
             result - gtsam optimzation result
         """
-        MIN_LANDMARK_SEEN = 3  # minimal number of corresponding keypoints to recover a landmarks
-        wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # camera to world rotation
-        depth = 20  # Back projection depth
-
         # Initialize factor Graph
         graph = gtsam.NonlinearFactorGraph()
-        initialEstimate = gtsam.Values()
 
-        # Add factors for all measurements
-        measurementNoiseSigma = 1.0
+        pose_indices, point_indices = self.create_index_sets()
+
+        initial_estimate = self.create_initial_estimate(pose_indices)
+
+        # Create Projection Factor
+        sigma = 1.0
         measurementNoise = gtsam.noiseModel_Isotropic.Sigma(
-            2, measurementNoiseSigma)
-        # Set pose prior noise
-        s = np.radians(60)
-        poseNoiseSigmas = np.array([s, s, s, 1, 1, 1])
-        posePriorNoise = gtsam.noiseModel_Diagonal.Sigmas(poseNoiseSigmas)
-
-        # Create dictionary for initial estimation
-        landmark_id_dict = {}
-        img_pose_id_dict = {}
+            2, sigma)
         for img_idx, features in enumerate(self._image_features):
             for kp_idx, keypoint in enumerate(features.keypoints):
                 if self.image_points[img_idx].kp_3d_exist(kp_idx):
                     landmark_id = self.image_points[img_idx].kp_3d(kp_idx)
-                    if self.landmark[landmark_id].seen >= MIN_LANDMARK_SEEN:
+                    if self._landmark_estimates[landmark_id].seen >= self._min_landmark_seen:
                         key_point = Point2(keypoint[0], keypoint[1])
-                        # Filter invalid landmarks
-                        if landmark_id_dict.get(landmark_id) is None:
-                            pose = Pose3(wRc, Point3(
-                                0, self.delta_z*img_idx, 2))
-                            landmark_3d_point = self.back_projection(
-                                key_point, pose, depth)
-                            landmark_id_dict[landmark_id] = landmark_3d_point
-                        # Filter invalid image poses
-                        if img_pose_id_dict.get(img_idx) is None:
-                            img_pose_id_dict[img_idx] = True
-                        # Create Projection Factor
                         graph.add(gtsam.GenericProjectionFactorCal3_S2(
                             key_point, measurementNoise,
                             X(img_idx), P(landmark_id), self._calibration))
 
-        # Initial estimate for poses
-        for idx in img_pose_id_dict:
-            pose_i = Pose3(
-                wRc, Point3(0, self.delta_z*idx, 2))
-            initialEstimate.insert(X(idx), pose_i)
-            # Create priors for first two poses
-            if idx in (0, 1):
-                graph.add(gtsam.PriorFactorPose3(
-                    X(idx), pose_i, posePriorNoise))
-            # Create priors for all poses
-            # graph.add(gtsam.PriorFactorPose3(X(idx), pose_i, posePriorNoise))
-
-        # Initialize estimation for landmarks
-        for idx in landmark_id_dict:
-            point_j = landmark_id_dict.get(idx)
-            initialEstimate.insert(P(idx), point_j)
+        # Create priors for first two poses
+        s = np.radians(60)
+        poseNoiseSigmas = np.array([s, s, s, 1, 1, 1])
+        posePriorNoise = gtsam.noiseModel_Diagonal.Sigmas(poseNoiseSigmas)
+        for idx in (0, 1):
+            pose_i = initial_estimate.atPose3(X(idx))
+            graph.add(gtsam.PriorFactorPose3(X(idx), pose_i, posePriorNoise))
 
         # Optimization
-        optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initialEstimate)
+        optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
         sfm_result = optimizer.optimize()
 
-        # Marginalization
-        marginals = gtsam.Marginals(graph, sfm_result)
-        for idx in img_pose_id_dict:
-            marginals.marginalCovariance(X(idx))
-        for idx in landmark_id_dict:
-            marginals.marginalCovariance(P(idx))
-
-        return sfm_result, img_pose_id_dict, landmark_id_dict
+        return sfm_result, pose_indices, point_indices
 
 
-def plot_sfm_result(result, poses, points):
+def plot_sfm_result(result, pose_indices, point_indices):
     """
     Plot mapping result.
     """
@@ -419,11 +428,11 @@ def plot_sfm_result(result, poses, points):
     plt.cla()
     # Plot points
     # gtsam_plot.plot_3d_points(_fignum, result, 'rx')
-    for idx in points:
+    for idx in point_indices:
         point_i = result.atPoint3(P(idx))
         gtsam_plot.plot_point3(_fignum, point_i, 'rx')
     # Plot cameras
-    for idx in poses:
+    for idx in pose_indices:
         pose_i = result.atPose3(X(idx))
         gtsam_plot.plot_pose3(_fignum, pose_i, 1)
     # Draw

@@ -6,6 +6,7 @@ import gtsam
 
 import numpy as np
 
+
 def parse_matches(data, skip_lines=0):
     """
     Parse the data to get the matches as a list of [frame_1, keypt_1, frame_2, keypt_2]
@@ -17,12 +18,8 @@ def parse_matches(data, skip_lines=0):
     data = data[skip_lines:]
     frames = list(map(int, data[0].split(' ')))
     num_matches = int(data[1])
-
-    # print(frames, num_matches)
-    matches = []
-    for idx in range(num_matches):
-        match = list(map(int, data[2+idx].split(' ')))
-        matches.append(match)
+    matches = [list(map(int, data[2+idx].split(' ')))
+               for idx in range(num_matches)]
 
     return frames, matches
 
@@ -67,3 +64,27 @@ def load_features(filename):
         descriptors.append(descriptor)
     return np.array(key_points), np.array(descriptors)
 
+
+def load_features_list(filename):
+    """
+    Load features from feature file `filename`
+
+    Return
+        features: List of tuples with each tuple as keypoint and feature descriptor
+    """
+    with open(filename) as file:
+        data = file.readlines()
+
+    num_features, feature_len = list(map(int, data[0].split()))
+
+    def extract_kp(idx):
+        desc = list(map(float, data[idx].split()))
+        return [desc[0], desc[1]]
+    def extract_desc(idx):
+        desc = list(map(float, data[idx].split()))
+        return desc[2:]
+
+    keypoints = [extract_kp(idx) for idx in range(1, num_features+1)]
+    desc = [extract_desc(idx) for idx in range(1, num_features+1)]
+
+    return keypoints, desc
