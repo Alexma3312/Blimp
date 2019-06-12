@@ -1,0 +1,7 @@
+*.jpg
+*.csv
+*.pyc
+*.bin
+*.ipch
+__pycache__/
+.vscode/
