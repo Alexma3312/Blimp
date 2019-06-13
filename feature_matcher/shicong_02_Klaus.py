@@ -9,7 +9,7 @@ import numpy as np
 import gtsam
 from feature_matcher.mapping_back_end import MappingBackEnd
 from gtsam import Cal3_S2, Point3, Pose3, Rot3# pylint: disable=ungrouped-imports
-from result_plotting.plotting import plot_sfm_result
+from utilities.plotting import plot_sfm_result
 
 
 def run():
