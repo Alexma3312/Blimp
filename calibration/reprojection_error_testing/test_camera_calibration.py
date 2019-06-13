@@ -1,6 +1,6 @@
 """Unit Test camera model and calibration matrix by calculating re-projection errors."""
 # cSpell: disable=invalid-name
-# pylint: disable=wrong-import-order
+# pylint: disable=wrong-import-order,line-too-long
 import unittest
 
 import numpy as np
@@ -12,24 +12,25 @@ from gtsam import (Cal3_S2, Cal3DS2,  # pylint: disable=no-name-in-module
 
 
 def calibration_select(choice):
-            #"""Distorted image variables setting"""
+    """"Choose different calibration matrix to test."""
+    #"""Distorted image variables setting"""
     # ROS calibration result
     if choice == 1:
         cal_distort = Cal3DS2(fx=347.820593, fy=329.096945, s=0, u0=295.717950,
-                              v0=222.964889,  k1=-0.284322, k2=0.055723, p1=0.006772, p2=0.005264)
+                              v0=222.964889, k1=-0.284322, k2=0.055723, p1=0.006772, p2=0.005264)
     if choice == 2:
         cal_distort = Cal3DS2(fx=333.4, fy=314.7, s=0, u0=303.6,
-                              v0=247.6,  k1=-0.282548, k2=0.054412, p1=-0.001882, p2=0.004796)
+                              v0=247.6, k1=-0.282548, k2=0.054412, p1=-0.001882, p2=0.004796)
     if choice == 3:
         cal_distort = Cal3DS2(fx=343.555173, fy=327.221818, s=0, u0=295.979699,
-                              v0=261.530851,  k1=-0.305247, k2=0.064438, p1=-0.007641, p2=0.006581)
+                              v0=261.530851, k1=-0.305247, k2=0.064438, p1=-0.007641, p2=0.006581)
     if choice == 4:
         cal_distort = Cal3DS2(fx=384.768827, fy=365.994262, s=0, u0=293.450481,
-                              v0=269.045187,  k1=-0.350338, k2=0.086711, p1=-0.006112, p2=0.013082)
+                              v0=269.045187, k1=-0.350338, k2=0.086711, p1=-0.006112, p2=0.013082)
     # Matlab toolbox calibration result
     if choice == 5:
         cal_distort = Cal3DS2(fx=331.0165, fy=310.4791, s=0, u0=332.7372,
-                              v0=248.5307,  k1=-0.3507, k2=0.1112, p1=8.6304e-04, p2=-0.0018)
+                              v0=248.5307, k1=-0.3507, k2=0.1112, p1=8.6304e-04, p2=-0.0018)
 
     # Manually extracted features
     # cam1_features = [Point2(293,307),Point2(292,348),Point2(292,364),Point2(328,307),Point2(327,347),Point2(326,362)]
