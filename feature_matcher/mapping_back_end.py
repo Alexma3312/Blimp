@@ -2,22 +2,19 @@
 """
 A Mapping Pipeline: feature match info parser, data association, and Bundle Adjustment(gtsam).
 """
-# pylint: disable=invalid-name, no-name-in-module, no-member, assignment-from-no-return, line-too-long
+# pylint: disable=invalid-name, no-name-in-module, no-member, assignment-from-no-return,line-too-long
 
 
 import copy
 import os
-import time
-from parser import get_matches, load_features_list
 
 import cv2
-import matplotlib.pyplot as plt
 import numpy as np
-from mpl_toolkits.mplot3d import Axes3D  # pylint: disable=unused-import
 
 import gtsam
-import gtsam.utils.plot as gtsam_plot
-from gtsam import Point2, Point3, Pose3, Rot3, symbol
+from feature_matcher.parser import get_matches, load_features_list
+from gtsam import (  # pylint: disable=wrong-import-order,ungrouped-imports
+    Point2, Point3, Pose3, Rot3, symbol)
 
 
 def X(i):
@@ -95,7 +92,7 @@ class ImageMatches():
     #     return False
 
 
-class LandMark(object):
+class LandMark():
     """
     Store landmark information.
         self.point - 1X3 np array
@@ -107,7 +104,7 @@ class LandMark(object):
         self.seen = seen
 
 
-class ImagePoints(object):
+class ImagePoints():
     """
     Store landmarks and poses corresponding information.
         self.kp_landmark - a dictionary, {key point index: landmark index}
@@ -131,7 +128,7 @@ class ImagePoints(object):
         return self.kp_landmark.get(kp_idx) is not None
 
 
-class ImagePose(object):
+class ImagePose():
     """
     Store pose transformation and projection matrix.
         self.T - transformation matrix, gtsam.Pose3 object
@@ -145,7 +142,7 @@ class ImagePose(object):
             (np.identity(3), np.zeros((3, 1)))))
 
 
-class MappingBackEnd(object):
+class MappingBackEnd():
     """
     Mapping Back End.
         data_directory - input files(feature and feature match data) directory path
@@ -155,17 +152,19 @@ class MappingBackEnd(object):
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, pose_priors, calibration, backprojection_depth=20):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, backprojection_depth=20):
         """Construct by reading from a data directory."""
-        self.basedir = data_directory
-        self.nrimages = num_images
+        self._basedir = data_directory
+        self._nrimages = num_images
         self._calibration = calibration
-        self.pose_priors = pose_priors
         self._min_landmark_seen = 3
-        self.depth = backprojection_depth
+        self._depth = backprojection_depth
+        self._pose_estimates = pose_estimates
+        self._measurement_noise = measurement_noise
+        self._pose_prior_noise = pose_prior_noise
 
         self._image_features = [self.load_image_features(
-            image_index) for image_index in range(self.nrimages)]
+            image_index) for image_index in range(self._nrimages)]
         self._image_matches = self.load_image_matches()
         self.image_points, self._landmark_estimates, self.image_poses = self.data_associate_all_images()
 
@@ -174,7 +173,7 @@ class MappingBackEnd(object):
             features - keypoints:A Nx2 list of (x,y). Descriptors: A Nx256 list of descriptors.
         """
         feat_file = os.path.join(
-            self.basedir, "{0:07}.key".format(image_index))
+            self._basedir, "{0:07}.key".format(image_index))
         keypoints, descriptors = load_features_list(feat_file)
         return ImageFeature(keypoints, descriptors)
 
@@ -183,7 +182,7 @@ class MappingBackEnd(object):
             matches - a list of [image 1 index, image 1 keypoint - (x,y), image 2 index, image 2 keypoint -(x,y)]
         """
         matches_file = os.path.join(
-            self.basedir, "match_{0}_{1}.dat".format(image_1, image_2))
+            self._basedir, "match_{0}_{1}.dat".format(image_1, image_2))
         _, matches = get_matches(matches_file)
         return matches
 
@@ -191,14 +190,14 @@ class MappingBackEnd(object):
         """
         Load feature match data of all image pairs iteratively and store all match information into one data structure.
             Input:
-                self.basedir- the base directory that stores all images.
-                self.nrimages- number of images
+                self._basedir- the base directory that stores all images.
+                self._nrimages- number of images
             Output:
                 image_matches: a list of ImageMatches objects.
         """
-        image_matches = [ImageMatches() for i in range(self.nrimages)]
+        image_matches = [ImageMatches() for i in range(self._nrimages)]
         # Iterate through all images and add frame i and frame i+1 matching data
-        for i in range(self.nrimages-1):
+        for i in range(self._nrimages-1):
             matches = self.get_matches_from_file(i, i+1)
             for match in matches:
                 # Update kp_matches dictionary in both frame i and frame i+1
@@ -296,10 +295,10 @@ class MappingBackEnd(object):
         Find feature data association across all images incrementally.
         """
         image_poses = [ImagePose(self._calibration.matrix())
-                       for i in range(self.nrimages)]
-        image_points = [ImagePoints({}) for i in range(self.nrimages)]
+                       for i in range(self._nrimages)]
+        image_points = [ImagePoints({}) for i in range(self._nrimages)]
         landmarks = [LandMark()]
-        for i in range(self.nrimages-1):
+        for i in range(self._nrimages-1):
             image_points, landmarks, image_poses = self.data_associate_single_image(
                 i, image_points, landmarks, image_poses)
 
@@ -357,15 +356,15 @@ class MappingBackEnd(object):
                         key = P(landmark_id)
                         if not initial_estimate.exists(key):
                             # do back-projection
-                            pose = self.pose_priors[img_idx]
+                            pose = self._pose_estimates[img_idx]
                             landmark_3d_point = self.back_projection(
-                                key_point, pose, self.depth)
+                                key_point, pose, self._depth)
                             initial_estimate.insert(
                                 P(landmark_id), landmark_3d_point)
 
         # Initial estimate for poses
         for idx in pose_indices:
-            pose_i = self.pose_priors[idx]
+            pose_i = self._pose_estimates[idx]
             initial_estimate.insert(X(idx), pose_i)
 
         return initial_estimate
@@ -386,10 +385,12 @@ class MappingBackEnd(object):
 
         initial_estimate = self.create_initial_estimate(pose_indices)
 
-        # Create Projection Factor
-        sigma = 1.0
-        measurementNoise = gtsam.noiseModel_Isotropic.Sigma(
-            2, sigma)
+        # """
+        #   Create measurement noise for bundle adjustment:
+        #   sigma = 1.0
+        #   measurement_noise = gtsam.noiseModel_Isotropic.Sigma(2, sigma)
+        # """
+        # Create Projection Factors
         for img_idx, features in enumerate(self._image_features):
             for kp_idx, keypoint in enumerate(features.keypoints):
                 if self.image_points[img_idx].kp_3d_exist(kp_idx):
@@ -397,69 +398,24 @@ class MappingBackEnd(object):
                     if self._landmark_estimates[landmark_id].seen >= self._min_landmark_seen:
                         key_point = Point2(keypoint[0], keypoint[1])
                         graph.add(gtsam.GenericProjectionFactorCal3_S2(
-                            key_point, measurementNoise,
+                            key_point, self._measurement_noise,
                             X(img_idx), P(landmark_id), self._calibration))
 
+        # """
+        #   Create pose prior noise:
+        #   rotation_sigma = np.radians(60)
+        #   translation_sigma = 1
+        #   pose_noise_sigmas = np.array([rotation_sigma, rotation_sigma, rotation_sigma,
+        #                             translation_sigma, translation_sigma, translation_sigma])
+        # """
         # Create priors for first two poses
-        s = np.radians(60)
-        poseNoiseSigmas = np.array([s, s, s, 1, 1, 1])
-        posePriorNoise = gtsam.noiseModel_Diagonal.Sigmas(poseNoiseSigmas)
         for idx in (0, 1):
             pose_i = initial_estimate.atPose3(X(idx))
-            graph.add(gtsam.PriorFactorPose3(X(idx), pose_i, posePriorNoise))
+            graph.add(gtsam.PriorFactorPose3(
+                X(idx), pose_i, self._pose_prior_noise))
 
         # Optimization
         optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
         sfm_result = optimizer.optimize()
 
         return sfm_result, pose_indices, point_indices
-
-
-def plot_sfm_result(result, pose_indices, point_indices):
-    """
-    Plot mapping result.
-    """
-    # Declare an id for the figure
-    _fignum = 0
-    fig = plt.figure(_fignum)
-    axes = fig.gca(projection='3d')
-    plt.cla()
-    # Plot points
-    # gtsam_plot.plot_3d_points(_fignum, result, 'rx')
-    for idx in point_indices:
-        point_i = result.atPoint3(P(idx))
-        gtsam_plot.plot_point3(_fignum, point_i, 'rx')
-    # Plot cameras
-    for idx in pose_indices:
-        pose_i = result.atPose3(X(idx))
-        gtsam_plot.plot_pose3(_fignum, pose_i, 1)
-    # Draw
-    axes.set_xlim3d(-20, 20)
-    axes.set_ylim3d(-20, 20)
-    axes.set_zlim3d(-20, 20)
-    plt.legend()
-    plt.show()
-
-
-def run():
-    """Execution."""
-    # Input images(undistorted) calibration
-    calibration = gtsam.Cal3_S2(
-        fx=232.0542, fy=252.8620, s=0, u0=325.3452, v0=240.2912)
-    # Create pose priors
-    wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # camera to world rotation
-    pose_priors = [Pose3(wRc, Point3(1.58*i, 0, 1.2)) for i in range(6)]
-    # Create MappingBackEnd instance
-    back_end = MappingBackEnd(
-        'feature_matcher/4d_agri_match_data/', 6, pose_priors, calibration)
-    # Bundle Adjustment
-    tic_ba = time.time()
-    sfm_result, poses, points = back_end.bundle_adjustment()
-    toc_ba = time.time()
-    print('BA spents ', toc_ba-tic_ba, 's')
-    # Plot
-    plot_sfm_result(sfm_result, poses, points)
-
-
-if __name__ == "__main__":
-    run()

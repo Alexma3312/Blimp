@@ -1,8 +1,6 @@
 """
 A Mapping Pipeline: feature match info parser, data association, and Bundle Adjustment(gtsam).
 """
-# pylint: disable=invalid-name, no-name-in-module, no-member
-
 import os
 import time
 
@@ -43,21 +41,23 @@ def transform_from(T, pose):
 class ImagePose(object):
     """
     Store both image and pose information.
-        self._descriptors - Nx256 np.array
-        self._keypoints - Nx2 np.array
+        self.desc - Nx256 np.array
+        self.kp - Nx2 np.array
     """
 
-    def __init__(self, calibration, descriptors, keypoints, argument_that_initialize_matches):
+    def __init__(self, calibration):
         # Initialize image information including key points and feature descriptors
-        self._descriptors = descriptors
-        self._keypoints = keypoints
-
-        # Initialize a dictionary to manage matching information between
-        # current frame keypoints indices and keypoints in other frames
+        self.desc = np.array([])
+        self.kp = np.array([])
+        # Initialize Pose information
+        self.R = Rot3()
+        self.t = Point3()
+        self.T = Pose3(self.R, self.t)
+        self.P = np.dot(calibration, np.hstack(
+            (np.identity(3), np.zeros((3, 1)))))
+        # Initialize a dictionary to manage matching information between current frame keypoints indices and keypoints in other frames
         self.kp_matches = {}
-
-        # Initialize a dictionary to manage matching information between
-        # keypoints indices and their corresponding landmarks indices
+        # Initialize a dictionary to manage matching information between keypoints indices sand their corresponding landmarks indices
         self.kp_landmark = {}
 
     def kp_match_idx(self, kp_idx, img_idx):
@@ -92,13 +92,13 @@ class LandMark(object):
 
 
 class MappingFrontEnd(object):
-    def __init__(self, data_directory, num_frames=3, delta_z=1):
-        """Construct by reading from a data directory."""
+    def __init__(self, data_directory='feature_matcher/sim_match_data/', num_frames=3, delta_z=1):
         self.basedir = data_directory
         self.nrframes = num_frames
 
         fov,  w, h = 60, 1280, 720
-        self._calibration = gtsam.Cal3_S2(fov, w, h)
+        self.cal = gtsam.Cal3_S2(fov, w, h)
+        self.calibration = self.cal.matrix()
 
         # Pose distance along z axis
         fps = 30
@@ -106,48 +106,52 @@ class MappingFrontEnd(object):
         # self.delta_z = velocity / fps
         self.delta_z = delta_z
 
+        self.img_pose = []
         self.landmark = []
 
-        def make_image_pose(frame_index):
-            """ Load features
-                features - A Nx2 np.array of (x,y), A Nx256 np.array of desc 
-            """
-            feat_file = os.path.join(
-                self.basedir, "{0:07}.key".format(frame_index))
-            descriptors, keypoints = load_features(feat_file)
-            return ImagePose(self._calibration.matrix(), descriptors, keypoints)
+    def load_features(self, frame_index):
+        """ Load features
+            features - A Nx2 np.array of (x,y), A Nx256 np.array of desc 
+        """
+        feat_file = os.path.join(
+            self.basedir, "{0:07}.key".format(frame_index))
+        features = load_features(feat_file)
+        return features
 
-        self._image_poses = [make_image_pose(
-            frame_index) for frame_index in range(self.nrframes)]
+    def load_matches(self, frame_1, frame_2):
+        """ Load matches
+            matches - a list of [frame_1, keypt_1, frame_2, keypt_2]
+        """
+        matches_file = os.path.join(
+            self.basedir, "match_{0}_{1}.dat".format(frame_1, frame_2))
+        _, matches = get_matches(matches_file)
+        return matches
 
-        def load_matches(frame_1, frame_2):
-            """ Load matches
-                matches - a list of [frame_1, keypt_1, frame_2, keypt_2]
-            """
-            matches_file = os.path.join(
-                basedir, "match_{0}_{1}.dat".format(frame_1, frame_2))
-            _, matches = get_matches(matches_file)
-            return matches
-
-        self.get_feature_matches()
-        self.initial_estimation()
+    def get_all_image_features(self):
+        """
+        Transfer feature extraction information into ImagePose object
+        """
+        for idx in range(self.nrframes):
+            image_pose = ImagePose(self.calibration)
+            image_pose.kp, image_pose.desc = self.load_features(idx)
+            self.img_pose.append(image_pose)
 
     def get_feature_matches(self):
         """
         Transfer feature match information into ImagePose object
         """
         # Iterate through all images and add frame i and frame i+1 matching data
-        for i in range(0, len(self._image_poses)-1):
+        for i in range(0, len(self.img_pose)-1):
             matches = self.load_matches(i, i+1)
             good_match_count = 0
             for match in matches:
                 # Update kp_matches dictionary in both frame i and frame i+1
-                if self._image_poses[i].kp_matches.get(match[1]) is None:
-                    self._image_poses[i].kp_matches[match[1]] = {}
-                self._image_poses[i].kp_matches[match[1]][i+1] = match[3]
-                if self._image_poses[i+1].kp_matches.get(match[3]) is None:
-                    self._image_poses[i+1].kp_matches[match[3]] = {}
-                self._image_poses[i+1].kp_matches[match[3]][i] = match[1]
+                if self.img_pose[i].kp_matches.get(match[1]) is None:
+                    self.img_pose[i].kp_matches[match[1]] = {}
+                self.img_pose[i].kp_matches[match[1]][i+1] = match[3]
+                if self.img_pose[i+1].kp_matches.get(match[3]) is None:
+                    self.img_pose[i+1].kp_matches[match[3]] = {}
+                self.img_pose[i+1].kp_matches[match[3]][i] = match[1]
 
                 good_match_count += 1
             # print("Feature matching ", i, " ", i+1, " ==> ", len(matches))
@@ -157,20 +161,19 @@ class MappingFrontEnd(object):
         Find feature data association across all images incrementally.  
         And estimate pose and landmark.
         """
-        for i in range(len(self._image_poses)-1):
+        for i in range(len(self.img_pose)-1):
             # Get keypoints and keypoint indices
             src = np.array([], dtype=np.float).reshape(0, 2)
             dst = np.array([], dtype=np.float).reshape(0, 2)
             kp_src_idx = []
             kp_dst_idx = []
-            for k in self._image_poses[i].kp_matches:
-                if self._image_poses[i].kp_match_exist(k, i+1):
+            for k in self.img_pose[i].kp_matches:
+                if self.img_pose[i].kp_match_exist(k, i+1):
                     k = int(k)
-                    match_idx = self._image_poses[i].kp_match_idx(k, i+1)
+                    match_idx = self.img_pose[i].kp_match_idx(k, i+1)
                     match_idx = int(match_idx)
-                    src = np.vstack((src, self._image_poses[i].kp[k]))
-                    dst = np.vstack(
-                        (dst, self._image_poses[i+1].kp[match_idx]))
+                    src = np.vstack((src, self.img_pose[i].kp[k]))
+                    dst = np.vstack((dst, self.img_pose[i+1].kp[match_idx]))
                     kp_dst_idx.append(match_idx)
                     kp_src_idx.append(k)
 
@@ -182,50 +185,46 @@ class MappingFrontEnd(object):
             # Initial estimate pose and landmark
             src = np.expand_dims(src, axis=1)
             dst = np.expand_dims(dst, axis=1)
-            # E, mask = cv2.findEssentialMat(dst,src,cameraMatrix = self._calibration.matrix(),method =cv2.LMEDS,prob=0.999)
+            # E, mask = cv2.findEssentialMat(dst,src,cameraMatrix = self.calibration,method =cv2.LMEDS,prob=0.999)
             E, mask = cv2.findEssentialMat(
-                dst, src, cameraMatrix=self._calibration.matrix(), method=cv2.RANSAC, prob=0.9, threshold=3)
+                dst, src, cameraMatrix=self.calibration, method=cv2.RANSAC, prob=0.9, threshold=3)
 
             _, local_R, local_t, _ = cv2.recoverPose(
-                E, dst, src, cameraMatrix=self._calibration.matrix())
+                E, dst, src, cameraMatrix=self.calibration)
             # print("R=",local_R)
             # print("t=",local_t)
 
             T = Pose3(Rot3(local_R), Point3(
                 local_t[0], local_t[1], local_t[2]))
 
-            self._image_poses[i +
-                              1].T = transform_from(T, self._image_poses[i].T)
-            cur_R = self._image_poses[i+1].T.rotation().matrix()
-            cur_t = self._image_poses[i+1].T.translation().vector()
+            self.img_pose[i+1].T = transform_from(T, self.img_pose[i].T)
+            cur_R = self.img_pose[i+1].T.rotation().matrix()
+            cur_t = self.img_pose[i+1].T.translation().vector()
             cur_t = np.expand_dims(cur_t, axis=1)
-            self._image_poses[i+1].P = np.dot(self._calibration.matrix(),
-                                              np.hstack((cur_R.T, -1*np.dot(cur_R.T, cur_t))))
+            self.img_pose[i+1].P = np.dot(self.calibration,
+                                          np.hstack((cur_R.T, -1*np.dot(cur_R.T, cur_t))))
 
             points4D = cv2.triangulatePoints(
-                projMatr1=self._image_poses[i].P, projMatr2=self._image_poses[i+1].P, projPoints1=src, projPoints2=dst)
+                projMatr1=self.img_pose[i].P, projMatr2=self.img_pose[i+1].P, projPoints1=src, projPoints2=dst)
             points4D = points4D / np.tile(points4D[-1, :], (4, 1))
             pt3d = points4D[:3, :].T
 
             # Find good triangulated points
             for j, k in enumerate(kp_src_idx):
                 if(mask[j]):
-                    match_idx = self._image_poses[i].kp_match_idx(k, i+1)
-                    if (self._image_poses[i].kp_3d_exist(k)):
-                        self._image_poses[i +
-                                          1].kp_landmark[match_idx] = self._image_poses[i].kp_3d(k)
-                        self.landmark[self._image_poses[i].kp_3d(
-                            k)].point += pt3d[j]
-                        self.landmark[self._image_poses[i +
-                                                        1].kp_3d(match_idx)].seen += 1
+                    match_idx = self.img_pose[i].kp_match_idx(k, i+1)
+                    if (self.img_pose[i].kp_3d_exist(k)):
+                        self.img_pose[i +1].kp_landmark[match_idx] = self.img_pose[i].kp_3d(k)
+                        self.landmark[self.img_pose[i].kp_3d(k)].point += pt3d[j]
+                        self.landmark[self.img_pose[i+1].kp_3d(match_idx)].seen += 1
                     else:
                         new_landmark = LandMark(pt3d[j], 2)
                         self.landmark.append(new_landmark)
 
-                        self._image_poses[i].kp_landmark[k] = len(
+                        self.img_pose[i].kp_landmark[k] = len(
                             self.landmark) - 1
-                        self._image_poses[i +
-                                          1].kp_landmark[match_idx] = len(self.landmark) - 1
+                        self.img_pose[i +
+                                      1].kp_landmark[match_idx] = len(self.landmark) - 1
 
         for j in range(len(self.landmark)):
             if(self.landmark[j].seen >= 3):
@@ -233,7 +232,7 @@ class MappingFrontEnd(object):
 
     def back_projection(self, key_point=Point2(), pose=Pose3(), depth=20):
         # Normalize input key_point
-        pn = self._calibration.calibrate(key_point)
+        pn = self.cal.calibrate(key_point)
         # Transfer normalized key_point into homogeneous coordinate and scale with depth
         ph = Point3(depth*pn.x(), depth*pn.y(), depth)
         # Transfer the point into the world coordinate
@@ -256,7 +255,7 @@ class MappingFrontEnd(object):
 
         landmark_id_list = {}
         img_pose_id_list = {}
-        for i, img_pose in enumerate(self._image_poses):
+        for i, img_pose in enumerate(self.img_pose):
             for k in range(len(img_pose.kp)):
                 if img_pose.kp_3d_exist(k):
                     landmark_id = img_pose.kp_3d(k)
@@ -274,7 +273,7 @@ class MappingFrontEnd(object):
                             img_pose_id_list[i] = True
                         graph.add(gtsam.GenericProjectionFactorCal3_S2(
                             key_point, measurementNoise,
-                            X(i), P(landmark_id), self._calibration))
+                            X(i), P(landmark_id), self.cal))
 
         # Set pose prior noise
         s = np.radians(60)
