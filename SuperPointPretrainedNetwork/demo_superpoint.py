@@ -730,9 +730,9 @@ if __name__ == '__main__':
     
     ## Modify Start
     # This is used to save the features information of each frame into a .txt file,
-    np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(pts[:2,]), fmt='%d')
+    # np.savetxt('dataset/key_points/key_points_%05d.txt' % vs.i,np.transpose(pts[:2,]), fmt='%d')
     # np.savetxt('dataset/features/features_%05d.txt' % vs.i,np.transpose(desc), fmt='%f')
-    np.savetxt('dataset/features/features_%05d.csv'% vs.i,np.transpose(desc),fmt='%10.5f',delimiter=',')
+    # np.savetxt('dataset/features/features_%05d.csv'% vs.i,np.transpose(desc),fmt='%10.5f',delimiter=',')
     ## Modify End
 
   # Close any remaining windows.
