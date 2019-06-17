@@ -89,6 +89,9 @@ class MappingBackEnd():
         for i in range(0, self._nrimages-1):
             for j in range(i+1, self._nrimages):
                 matches = self.load_matches(i, j)
+                # If no matches exist return empty set.
+                if matches == []:
+                    return {}
                 matches_array = np.array(matches)
                 keypt_1 = list(matches_array[:, 1])
                 keypt_2 = list(matches_array[:, 3])

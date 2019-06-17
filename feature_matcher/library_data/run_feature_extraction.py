@@ -6,7 +6,7 @@ from feature_extraction.feature_extraction import FeatureExtraction
 
 def run():
     """Execution"""
-    image_directory_path = 'feature_matcher/library_data/dark/undistort_images/'
+    image_directory_path = 'feature_matcher/library_data/bright/undistort_images/'
     image_extension = '*.jpg'
     image_size = (640, 480)
     nn_thresh = 0.7
