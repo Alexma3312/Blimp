@@ -27,7 +27,7 @@ def load_points():
     return pts3d
 
 
-class TestMapping(GtsamTestCase):
+class TestMappingBackEnd(GtsamTestCase):
     """Unit tests for mapping."""
 
     def setUp(self):

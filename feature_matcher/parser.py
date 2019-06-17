@@ -1,8 +1,11 @@
 """Module for parsing with feature extraction and feature matching data file."""
 # cSpell: disable=invalid-name
+
 # from collections import defaultdict
 
 import numpy as np
+
+import gtsam
 
 
 def parse_matches(data, skip_lines=0):
@@ -38,6 +41,32 @@ def get_matches(filename):
 
 
 def load_features(filename):
+    """
+    Load features from feature file `filename`
+
+    Return
+        features: List of tuples with each tuple as keypoint(list) and feature descriptor(list)
+    """
+    with open(filename) as file:
+        data = file.readlines()
+
+    num_features, _ = list(map(int, data[0].split()))
+
+    def extract_kp(idx):
+        desc = list(map(float, data[idx].split()))
+        return gtsam.Point2(desc[0], desc[1])  # pylint:disable=no-member
+
+    def extract_desc(idx):
+        desc = list(map(float, data[idx].split()))
+        return desc[2:]
+
+    keypoints = [extract_kp(idx) for idx in range(1, num_features+1)]
+    descriptors = [extract_desc(idx) for idx in range(1, num_features+1)]
+
+    return keypoints, descriptors
+
+
+def load_features_array(filename):
     """
     Load features from feature file `filename`
 

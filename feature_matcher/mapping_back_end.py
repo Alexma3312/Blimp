@@ -179,7 +179,7 @@ class MappingBackEnd():
 
     def get_matches_from_file(self, image_1, image_2):
         """ Load matches from .dat files
-            matches - a list of [image 1 index, image 1 keypoint - (x,y), image 2 index, image 2 keypoint -(x,y)]
+            matches - a list of [image 1 index, image 1 keypoint index, image 2 index, image 2 keypoint index]
         """
         matches_file = os.path.join(
             self._basedir, "match_{0}_{1}.dat".format(image_1, image_2))
