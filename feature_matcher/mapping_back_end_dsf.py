@@ -46,7 +46,9 @@ class MappingBackEnd():
         self._measurement_noise = measurement_noise
         self._pose_prior_noise = pose_prior_noise
         self._image_features = [self.load_features(
-            image_index) for image_index in range(self._nrimages)]
+            image_index)[0] for image_index in range(self._nrimages)]
+        self.image_descriptors = [self.load_features(
+            image_index)[1] for image_index in range(self._nrimages)]
         landmark_map, dsf = self.create_landmark_map()
         self._landmark_map = self.filter_bad_landmarks(landmark_map, dsf)
 
@@ -56,8 +58,8 @@ class MappingBackEnd():
         """
         feat_file = os.path.join(
             self._basedir, "{0:07}.key".format(image_index))
-        keypoints, _ = load_features(feat_file)
-        return keypoints
+        keypoints, descriptors = load_features(feat_file)
+        return keypoints, descriptors
 
     def load_matches(self, frame_1, frame_2):
         """ Load matches from .dat files

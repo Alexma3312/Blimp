@@ -59,11 +59,11 @@ class TestMappingBackEnd(GtsamTestCase):
         for item in expected_landmark_map.items():
             assert (
                 item[0] in actual_landmark_map), "FAIL: Test create landmark map."
-        for i, observation in enumerate(expected_landmark_map[item[0]]):
-            self.assertEqual(
-                actual_landmark_map[item[0]][i][0], observation[0])
-            self.gtsamAssertEquals(
-                actual_landmark_map[item[0]][i][1], observation[1])
+            for i, observation in enumerate(expected_landmark_map[item[0]]):
+                self.assertEqual(
+                    actual_landmark_map[item[0]][i][0], observation[0])
+                self.gtsamAssertEquals(
+                    actual_landmark_map[item[0]][i][1], observation[1])
 
     def test_load_points(self):
         """Test load points."""
@@ -72,7 +72,7 @@ class TestMappingBackEnd(GtsamTestCase):
 
     def test_load_features(self):
         """Test load image features"""
-        image_features = self.back_end.load_features(0)
+        image_features, _ = self.back_end.load_features(0)
         self.assertIsInstance(image_features, list)
 
     def test_load_matches(self):
