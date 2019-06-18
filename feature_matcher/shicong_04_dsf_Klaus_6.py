@@ -9,7 +9,7 @@ import numpy as np
 import gtsam
 from feature_matcher.mapping_back_end_dsf import MappingBackEnd
 from gtsam import Cal3_S2, Point3, Pose3, Rot3  # pylint: disable=ungrouped-imports
-from utilities.plotting import plot_with_result
+from utilities.plotting import plot_with_results
 
 
 def run():
@@ -30,18 +30,34 @@ def run():
     pose_noise_sigmas = np.array([rotation_sigma, rotation_sigma, rotation_sigma,
                                   translation_sigma, translation_sigma, translation_sigma])
     pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
-    # Create MappingBackEnd instance
-    data_directory = 'feature_matcher/4d_agri_match_data/'
+
+    #"""Use 4D agri matching"""
+    data_directory = 'feature_matcher/Klaus_4d_agri_match_data/'
     num_images = 6
+    min_obersvation_number = 6
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise, 6)
+                              pose_estimates, measurement_noise, pose_prior_noise, min_obersvation_number)
     # Bundle Adjustment
     tic_ba = time.time()
-    sfm_result = back_end.bundle_adjustment()
+    sfm_result1 = back_end.bundle_adjustment()
     toc_ba = time.time()
     print('BA spents ', toc_ba-tic_ba, 's')
+
+    #"""Use Superpoint matching"""
+    # Create MappingBackEnd instance
+    data_directory = 'feature_matcher/Klaus_Superpoint_match_data/'
+    num_images = 6
+    min_obersvation_number = 6
+    back_end = MappingBackEnd(data_directory, num_images, calibration,
+                              pose_estimates, measurement_noise, pose_prior_noise, min_obersvation_number)
+    # Bundle Adjustment
+    tic_ba = time.time()
+    sfm_result2 = back_end.bundle_adjustment()
+    toc_ba = time.time()
+    print('BA spents ', toc_ba-tic_ba, 's')
+
     # Plot Result
-    plot_with_result(sfm_result, 20, 20, 20)
+    plot_with_results(sfm_result1, sfm_result2, 20, 20, 20)
 
 
 if __name__ == "__main__":
