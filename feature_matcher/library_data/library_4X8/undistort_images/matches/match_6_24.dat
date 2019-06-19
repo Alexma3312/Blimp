@@ -1,0 +1,14 @@
+/* Format: 
+ frame_1_idx frame_2_idx 
+ num_of_matches
+ frame_1_idx feature_idx frame_2_idx feature_idx */
+6 24
+8
+6 20 24 272
+6 172 24 202
+6 208 24 254
+6 232 24 260
+6 285 24 356
+6 308 24 290
+6 323 24 389
+6 324 24 178
