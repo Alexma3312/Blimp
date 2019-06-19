@@ -1,8 +1,8 @@
 # cSpell: disable=invalid-name
 """
-Unit tests for mapping back end dsf. 
+Unit tests for mapping back end dsf.
 """
-# pylint: disable=no-name-in-module, wrong-import-order, no-member
+# pylint: disable=no-name-in-module, wrong-import-order, no-member, line-too-long
 
 import unittest
 
@@ -10,9 +10,8 @@ import numpy as np
 
 import gtsam
 from feature_matcher.mapping_back_end_dsf import MappingBackEnd, P, X
-from gtsam import Cal3_S2, Point2, Point3, Pose3, Rot3, Values
+from gtsam import Cal3_S2, Point2, Point3, Pose3, Rot3 # pylint: disable=ungrouped-imports
 from gtsam.utils.test_case import GtsamTestCase
-from utilities.plotting import plot_with_result
 
 
 def load_points():
@@ -49,10 +48,11 @@ class TestMappingBackEnd(GtsamTestCase):
         pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
         # Create MappingBackEnd instance
         data_directory = 'feature_matcher/sim_match_data/'
+        min_obersvation_number = 2
+        filter_bad_landmarks_enable = True
         self.num_images = 3
-
         self.back_end = MappingBackEnd(
-            data_directory, self.num_images, calibration, self.pose_estimates, measurement_noise, pose_prior_noise, 2)  # pylint: disable=line-too-long
+            data_directory, self.num_images, calibration, self.pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number)  # pylint: disable=line-too-long
 
     def assert_landmark_map_equal(self, actual_landmark_map, expected_landmark_map):
         """Helper function to test landmark map."""
@@ -87,13 +87,15 @@ class TestMappingBackEnd(GtsamTestCase):
         # """Test find bad matches."""
         data_directory = 'feature_matcher/dsf_test_data/'
         num_images = 3
+        filter_bad_landmarks_enable = False
+        min_obersvation_number = 3
         back_end = MappingBackEnd(
-            data_directory, num_images, gtsam.Cal3_S2(), [], [], [], 3)
+            data_directory, num_images, gtsam.Cal3_S2(), [], [], [], filter_bad_landmarks_enable, min_obersvation_number)
         bad_matches = back_end.find_bad_matches()
         self.assertEqual(bad_matches, {(2, 6), (0, 4)})
 
         # """Test create landmark map."""
-        actual_landmark_map, dsf = back_end.create_landmark_map()
+        actual_landmark_map, dsf = back_end.create_landmark_map(False)
         expected_landmark_map = {(0, 1): [(0, Point2(1, 1)), (1, Point2(2, 1)), (2, Point2(3, 1))], (2, 0): [(2, Point2(0, 0))], (0, 0): [(0, Point2(0, 0))], (0, 5): [(0, Point2(1, 5)), (0, Point2(1, 6)), (2, Point2(3, 6))], (0, 4): [
             (0, Point2(1, 4)), (2, Point2(3, 3)), (2, Point2(3, 5))], (1, 0): [(1, Point2(0, 0))], (0, 3): [(0, Point2(1, 3)), (1, Point2(2, 2)), (2, Point2(3, 2))], (0, 2): [(0, Point2(1, 2)), (2, Point2(3, 4))]}
         self.assert_landmark_map_equal(
@@ -106,7 +108,7 @@ class TestMappingBackEnd(GtsamTestCase):
 
         # """Test filter bad landmarks."""
         actual_landmark_map = back_end.filter_bad_landmarks(
-            expected_landmark_map, dsf)
+            expected_landmark_map, dsf, True)
         expected_landmark_map = [[(0, Point2(1, 1)), (1, Point2(2, 1)), (2, Point2(3, 1))], [
             (0, Point2(1, 3)), (1, Point2(2, 2)), (2, Point2(3, 2))]]
         # self.assert_landmark_map_equal(actual_landmark_map, expected_landmark_map)

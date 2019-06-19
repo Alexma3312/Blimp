@@ -35,8 +35,9 @@ def run():
     data_directory = 'feature_matcher/Klaus_4d_agri_match_data/'
     num_images = 6
     min_obersvation_number = 6
+    filter_bad_landmarks_enable = True
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise, min_obersvation_number)
+                              pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number)
     # Bundle Adjustment
     tic_ba = time.time()
     sfm_result1 = back_end.bundle_adjustment()
@@ -46,8 +47,9 @@ def run():
     #"""Use Superpoint matching"""
     # Create MappingBackEnd instance
     data_directory = 'feature_matcher/Klaus_Superpoint_match_data/'
+    # data_directory = 'feature_matcher/Klaus_filter_match_data/'
     num_images = 6
-    min_obersvation_number = 6
+    min_obersvation_number = 3
     back_end = MappingBackEnd(data_directory, num_images, calibration,
                               pose_estimates, measurement_noise, pose_prior_noise, min_obersvation_number)
     # Bundle Adjustment
@@ -56,8 +58,8 @@ def run():
     toc_ba = time.time()
     print('BA spents ', toc_ba-tic_ba, 's')
 
-    # Plot Result
-    plot_with_results(sfm_result1, sfm_result2, 20, 20, 20)
+    # # Plot Result
+    plot_with_results(sfm_result1, sfm_result2, 30, 30, 30)
 
 
 if __name__ == "__main__":

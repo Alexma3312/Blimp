@@ -49,9 +49,10 @@ class TestMappingBackEnd(GtsamTestCase):
         pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
         # Create MappingBackEnd instance
         data_directory = 'feature_matcher/sim_match_data/'
+        min_landmark_seen = 3
         self.num_images = 3
         self.back_end = MappingBackEnd(
-            data_directory, self.num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise)# pylint: disable=line-too-long
+            data_directory, self.num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, min_landmark_seen)  # pylint: disable=line-too-long
 
     def test_transform_from(self):
         """Test transform form"""

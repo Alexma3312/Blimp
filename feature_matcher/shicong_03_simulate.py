@@ -8,7 +8,7 @@ import numpy as np
 
 import gtsam
 from feature_matcher.mapping_back_end import MappingBackEnd
-from gtsam import Cal3_S2, Point3, Pose3, Rot3# pylint: disable=ungrouped-imports
+from gtsam import Cal3_S2, Point3, Pose3, Rot3  # pylint: disable=ungrouped-imports
 from utilities.plotting import plot_sfm_result
 
 
@@ -33,8 +33,9 @@ def run():
     # Create MappingBackEnd instance
     data_directory = 'feature_matcher/sim_match_data/'
     num_images = 3
+    min_landmark_seen = 3
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise)
+                              pose_estimates, measurement_noise, pose_prior_noise, min_landmark_seen)
     # Bundle Adjustment
     tic_ba = time.time()
     sfm_result, poses, points = back_end.bundle_adjustment()

@@ -8,7 +8,7 @@ import numpy as np
 
 import gtsam
 from feature_matcher.mapping_back_end import MappingBackEnd
-from gtsam import Cal3_S2, Point3, Pose3, Rot3# pylint: disable=ungrouped-imports
+from gtsam import Cal3_S2, Point3, Pose3, Rot3  # pylint: disable=ungrouped-imports
 from utilities.plotting import plot_sfm_result
 
 
@@ -31,10 +31,11 @@ def run():
                                   translation_sigma, translation_sigma, translation_sigma])
     pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
     # Create MappingBackEnd instance
-    data_directory = 'feature_matcher/4d_agri_match_data/'
+    data_directory = 'feature_matcher/Klaus_4d_agri_match_data/'
     num_images = 6
+    min_landmark_seen = 6
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise)
+                              pose_estimates, measurement_noise, pose_prior_noise, min_landmark_seen)
     # Bundle Adjustment
     tic_ba = time.time()
     sfm_result, poses, points = back_end.bundle_adjustment()

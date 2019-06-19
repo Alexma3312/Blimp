@@ -8,9 +8,9 @@ from gtsam import Cal3_S2
 
 def run():
     """Execution"""
-    basedir = "feature_matcher/library_data/bright/"
+    basedir = "feature_matcher/library_data/library_4X8/source_images/"
     img_extension = ".jpg"
-    output_dir = "feature_matcher/library_data/bright/undistort_images/"
+    output_dir = "feature_matcher/library_data/library_4X8/undistort_images/"
     output_prefix = "frame"
     calibration = Cal3_S2(
         fx=347.820593, fy=329.096945, s=0, u0=295.717950, v0=222.964889).matrix()
@@ -21,10 +21,5 @@ def run():
     undistort(basedir, img_extension, output_dir, output_prefix,
               calibration, distortion, undist_calibration)
 
-    basedir = "feature_matcher/library_data/dark/"
-    img_extension = ".jpg"
-    output_dir = "feature_matcher/library_data/dark/undistort_images/"
-    undistort(basedir, img_extension, output_dir, output_prefix,
-              calibration, distortion, undist_calibration)
 if __name__ == "__main__":
     run()

@@ -1,6 +1,6 @@
 """Mapping back end based on DSF (disjoint set forests)"""
 # cSpell: disable=
-# pylint: disable=no-member, no-name-in-module
+# pylint: disable=no-member, no-name-in-module, line-too-long
 
 import copy
 import os
@@ -35,17 +35,23 @@ class MappingBackEnd():
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, backprojection_depth=20):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20):
         """Construct by reading from a data directory."""
+        # Parameters for CV2 find Essential matrix
+        self._cv_prob = prob
+        self._cv_threshold = threshold
+        # Mapping result tunning parameters
+        self._seen = min_obersvation_number
+        self._depth = backprojection_depth
+        # Basic variables
         self._basedir = data_directory
         self._nrimages = num_images
         self._calibration = calibration
-        self._min_landmark_seen = 3
-        self._seen = min_obersvation_number
-        self._depth = backprojection_depth
+        # GTSAM graph optimization parameters
         self._pose_estimates = pose_estimates
         self._measurement_noise = measurement_noise
         self._pose_prior_noise = pose_prior_noise
+        # Store all features and descriptors
         self._image_features = [self.load_features(
             image_index)[0] for image_index in range(self._nrimages)]
         self.image_descriptors = [self.load_features(
@@ -53,10 +59,6 @@ class MappingBackEnd():
         landmark_map, dsf = self.create_landmark_map()
         self._landmark_map = self.filter_bad_landmarks(
             landmark_map, dsf, filter_bad_landmarks_enable)
-
-        # RANSAC PARAMETER
-        self.prob = 0.9
-        self.threshold = 3
 
     def load_features(self, image_index):
         """ Load features from .key files
@@ -94,24 +96,25 @@ class MappingBackEnd():
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
         _, mask = cv2.findEssentialMat(
-            dst, src, self._calibration.matrix(), cv2.RANSAC, 0.9, 3.0)
+            dst, src, cameraMatrix=self._calibration.matrix(), method=cv2.RANSAC, prob=self._cv_prob, threshold=self._cv_threshold)
         good_matches = [matches[i]
                         for i, score in enumerate(mask) if score == 1]
         return False, good_matches
 
-    def generate_dsf(self):
+    def generate_dsf(self, enable=True):
         """Use dsf to find data association between landmark and landmark observation(features)"""
         dsf = gtsam.DSFMapIndexPair()
 
         for i in range(0, self._nrimages-1):
             for j in range(i+1, self._nrimages):
                 matches = self.load_matches(i, j)
-                bad_essential, matches = self.ransac_filter_keypoints(
-                    matches, i, j)
-                if bad_essential:
-                    print(
-                        "Not enough points to generate essential matrix for image_", i, " and image_", j)
-                    continue
+                if enable:
+                    bad_essential, matches = self.ransac_filter_keypoints(
+                        matches, i, j)
+                    if bad_essential:
+                        print(
+                            "Not enough points to generate essential matrix for image_", i, " and image_", j)
+                        continue
                 for frame_1, keypt_1, frame_2, keypt_2 in matches:
                     dsf.merge(gtsam.IndexPair(frame_1, keypt_1),
                               gtsam.IndexPair(frame_2, keypt_2))
@@ -172,10 +175,10 @@ class MappingBackEnd():
 
         return landmark_map_new
 
-    def create_landmark_map(self):
+    def create_landmark_map(self, enable=True):
         """Create a list to map landmarks and their correspondences.
             [Landmark_i:[(i,Point2()), (j,Point2())...]...]"""
-        dsf = self.generate_dsf()
+        dsf = self.generate_dsf(enable)
         landmark_map = defaultdict(list)
         for img_index, feature_list in enumerate(self._image_features):
             for feature_index, feature in enumerate(feature_list):
@@ -230,7 +233,7 @@ class MappingBackEnd():
         """
         Parameters:
             calibration - gtsam.Cal3_S2, camera calibration
-            landmark_map - list, A map of landmarks and their correspondence 
+            landmark_map - list, A map of landmarks and their correspondence
         """
         # Initialize factor Graph
         graph = gtsam.NonlinearFactorGraph()

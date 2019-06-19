@@ -152,12 +152,12 @@ class MappingBackEnd():
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, backprojection_depth=20):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, min_landmark_seen, backprojection_depth=20):
         """Construct by reading from a data directory."""
         self._basedir = data_directory
         self._nrimages = num_images
         self._calibration = calibration
-        self._min_landmark_seen = 3
+        self._min_landmark_seen = min_landmark_seen
         self._depth = backprojection_depth
         self._pose_estimates = pose_estimates
         self._measurement_noise = measurement_noise

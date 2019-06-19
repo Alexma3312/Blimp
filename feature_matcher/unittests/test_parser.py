@@ -6,7 +6,7 @@ Unit tests for Parser
 
 import unittest
 
-from feature_matcher.parser import (get_matches, load_features,
+from feature_matcher.parser import (get_matches, load_features_array,
                                     load_features_list, parse_matches)
 
 
@@ -26,7 +26,7 @@ class TestMapping(unittest.TestCase):
 
     def test_load_features(self):
         """test load features"""
-        keypoints, descriptors = load_features(
+        keypoints, descriptors = load_features_array(
             'feature_matcher/sim_match_data/0000000.key')
         self.assertEqual(keypoints.shape[1], 2)
         self.assertEqual(descriptors.shape[0], keypoints.shape[0])

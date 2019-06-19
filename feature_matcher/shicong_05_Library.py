@@ -29,6 +29,7 @@ def run():
                                                   [0, 1, 0],
                                                   [math.sin(delta*i), 0, math.cos(delta*i)]])
                                         )), Point3(0, 0, 1.5)) for i in range(8)]
+    
     # Create measurement noise for bundle adjustment
     sigma = 1.0
     measurement_noise = gtsam.noiseModel_Isotropic.Sigma(2, sigma)
