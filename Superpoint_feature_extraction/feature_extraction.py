@@ -7,6 +7,7 @@ import numpy as np
 
 from SuperPointPretrainedNetwork.demo_superpoint import (PointTracker,
                                                          SuperPointFrontend)
+from feature_matcher.parser import get_matches
 
 # pylint: disable=no-member
 
@@ -180,10 +181,11 @@ class FeatureExtraction(object):
                 bad_essential_matrix, good_matches = self.ransac_filter(
                     matches, keypoints_1, keypoints_2, threshold, calibration)
                 if bad_essential_matrix:
+                    print("Not enough points to generate essential matrix for image_", i, " and image_", j)
                     continue
-                print("Matches between image {} and image {} (ransac filter/two side matches): ".format(i, j),
+                print("Matches between image {} and image {} (ransac filter/two way NN matches): ".format(i, j),
                       good_matches.shape[0], "/", matches.shape[1])
-                # self.save_feature_matches(i, j, good_matches)
+                self.save_feature_matches(i, j, good_matches)
                 self.save_match_images(
                     i, j, good_matches, keypoints_1, keypoints_2)
 
@@ -196,8 +198,6 @@ class FeatureExtraction(object):
             dst = np.vstack((dst, keypoints_2[int(match[1])]))
 
         if src.shape[0] < 6:
-            print(
-                "Not enough points to generate essential matrix for image_", i, " and image_", j)
             return True, np.array([])
 
         src = np.expand_dims(src, axis=1)
@@ -210,14 +210,14 @@ class FeatureExtraction(object):
 
         return False, good_matches
 
-    def save_feature_matches(self, idx1, idx2, matches):
+    def save_feature_matches(self, idx1, idx2, matches, save_dir='matches/'):
         """Save the feature matches of index 1 image and index 2 image."""
         matches_number = matches.shape[0]
         idx1_col = np.array([idx1]*matches_number).reshape(matches_number, 1)
         idx2_col = np.array([idx2]*matches_number).reshape(matches_number, 1)
         match_result = np.concatenate((idx1_col, matches[:, 0].reshape(
             matches_number, 1), idx2_col, matches[:, 1].reshape(matches_number, 1)), axis=1)
-        dir_name = self.basedir+'matches/'
+        dir_name = self.basedir+save_dir
         if not os.path.exists(dir_name):
             os.mkdir(dir_name)
 
@@ -250,3 +250,25 @@ class FeatureExtraction(object):
             cv2.circle(vis, pt_dst, 3, (0, 255, 0), -1, lineType=16)
             cv2.line(vis, pt_src, pt_dst, (255, 0, 255), 1)
         cv2.imwrite(file_name, vis)
+
+    def filter_match_with_two_way_nn(self):
+        """Performs two-way nearest neighbor matching of two sets of descriptors, 
+            such that the NN match from descriptor A->B must equal the NN match from B->A"""
+        dir_name_1 = self.basedir+'matches/'
+        dir_name_2 = self.basedir+'4d_matches/'
+        image_number = len(self.img_paths)
+        for i in range(image_number-1):
+            for j in range(i+1, image_number):
+                file_name_1 = dir_name_1+'match_{}_{}.dat'.format(i, j)
+                _, matches = get_matches(file_name_1)
+                matches = np.array(matches)[:, (1, 3)]
+
+                file_name_2 = dir_name_2+'match_{}_{}.dat'.format(i, j)
+                _, matches_4d = get_matches(file_name_2)
+                matches_4d = np.array(matches_4d)[:, (1, 3)]
+
+                # Get intersecting rows across two 2D numpy arrays
+                new_matches = np.array(
+                    [x for x in set(tuple(x) for x in matches) & set(tuple(x) for x in matches_4d)])
+                print("matches:",matches.shape,"matches_4d:",matches_4d.shape,'new_matches:',new_matches.shape)
+                self.save_feature_matches(i, j, new_matches, "new_matches/")
