@@ -5,3 +5,5 @@
 # *.ipch
 __pycache__/
 .vscode/
+*.dat
+*.key

@@ -109,8 +109,10 @@ class FeatureExtraction(object):
         dir_name = self.basedir+'features/'
         if not os.path.exists(dir_name):
             os.mkdir(dir_name)
+        # np.savetxt(dir_name+self.leading_zero(index) +
+        #            '.key', features, fmt='%.4f')        
         np.savetxt(dir_name+self.leading_zero(index) +
-                   '.key', features, fmt='%.4f')
+                   '.key', features)
 
         first_line = str(nrpoints)+' '+str(descriptor_length)+'\n'
         with open(dir_name+self.leading_zero(index)+'.key', 'r+') as f:
