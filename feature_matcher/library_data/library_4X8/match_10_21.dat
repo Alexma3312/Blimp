@@ -1,6 +1,0 @@
-/* Format: 
- frame_1_idx frame_2_idx 
- num_of_matches 
- frame_1_idx feature_idx frame_2_idx feature_idx */
-10 21
-0
