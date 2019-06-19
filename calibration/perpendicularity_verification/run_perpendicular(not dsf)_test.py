@@ -7,10 +7,9 @@ import time
 import numpy as np
 
 import gtsam
-from feature_matcher.mapping_back_end_dsf import MappingBackEnd
-from gtsam import (Cal3_S2, Point3, Pose3,  # pylint: disable=ungrouped-imports
-                   Rot3)
-from utilities.plotting import plot_with_results
+from feature_matcher.mapping_back_end import MappingBackEnd
+from gtsam import Cal3_S2, Point3, Pose3, Rot3  # pylint: disable=ungrouped-imports
+from utilities.plotting import plot_sfm_result
 
 
 def run():
@@ -34,27 +33,18 @@ def run():
                                   translation_sigma, translation_sigma, translation_sigma])
     pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
     # Create MappingBackEnd instance
-    data_directory = 'feature_matcher/library_data/perpendicular_walls_manual/'
+    data_directory = 'calibration/perpendicularity_verification/perpendicular_walls_manual_data/'
+    num_images = 3
+    min_landmark_seen = 3
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise, 2, 2)
+                              pose_estimates, measurement_noise, pose_prior_noise, min_landmark_seen)
     # Bundle Adjustment
     tic_ba = time.time()
-    sfm_result1 = back_end.bundle_adjustment()
+    sfm_result, poses, points = back_end.bundle_adjustment()
     toc_ba = time.time()
     print('BA spents ', toc_ba-tic_ba, 's')
-
-    # Create MappingBackEnd instance
-    data_directory = 'feature_matcher/library_data/perpendicular_walls/'
-    back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise, 2, 3)
-    # Bundle Adjustment
-    tic_ba = time.time()
-    sfm_result2 = back_end.bundle_adjustment()
-    toc_ba = time.time()
-    print('BA spents ', toc_ba-tic_ba, 's')
-
     # Plot Result
-    plot_with_results(sfm_result1, sfm_result2, 5, 5, 5)
+    plot_sfm_result(sfm_result, poses, points, 5, 5, 5)
 
 
 if __name__ == "__main__":
