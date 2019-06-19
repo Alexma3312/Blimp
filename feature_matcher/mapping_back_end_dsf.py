@@ -6,6 +6,7 @@ import copy
 import os
 from collections import defaultdict
 
+import cv2
 import numpy as np
 
 import gtsam
@@ -34,7 +35,7 @@ class MappingBackEnd():
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, min_obersvation_number=4, backprojection_depth=20):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, backprojection_depth=20):
         """Construct by reading from a data directory."""
         self._basedir = data_directory
         self._nrimages = num_images
@@ -50,7 +51,12 @@ class MappingBackEnd():
         self.image_descriptors = [self.load_features(
             image_index)[1] for image_index in range(self._nrimages)]
         landmark_map, dsf = self.create_landmark_map()
-        self._landmark_map = self.filter_bad_landmarks(landmark_map, dsf)
+        self._landmark_map = self.filter_bad_landmarks(
+            landmark_map, dsf, filter_bad_landmarks_enable)
+
+        # RANSAC PARAMETER
+        self.prob = 0.9
+        self.threshold = 3
 
     def load_features(self, image_index):
         """ Load features from .key files
@@ -67,8 +73,31 @@ class MappingBackEnd():
         """
         matches_file = os.path.join(
             self._basedir, "match_{0}_{1}.dat".format(frame_1, frame_2))
+        if os.path.isfile(matches_file) is False:
+            return []
         _, matches = get_matches(matches_file)
         return matches
+
+    def ransac_filter_keypoints(self, matches, idx1, idx2):
+        """Use opencv ransac to filter matches."""
+        src = np.array([], dtype=np.float).reshape(0, 2)
+        dst = np.array([], dtype=np.float).reshape(0, 2)
+        for match in matches:
+            kp_src = self._image_features[idx1][int(match[1])]
+            kp_dst = self._image_features[idx2][int(match[3])]
+            src = np.vstack((src, [float(kp_src.x()), float(kp_src.y())]))
+            dst = np.vstack((dst, [float(kp_dst.x()), float(kp_dst.y())]))
+
+        if src.shape[0] < 6:
+            return True, []
+
+        src = np.expand_dims(src, axis=1)
+        dst = np.expand_dims(dst, axis=1)
+        _, mask = cv2.findEssentialMat(
+            dst, src, self._calibration.matrix(), cv2.RANSAC, 0.9, 3.0)
+        good_matches = [matches[i]
+                        for i, score in enumerate(mask) if score == 1]
+        return False, good_matches
 
     def generate_dsf(self):
         """Use dsf to find data association between landmark and landmark observation(features)"""
@@ -77,6 +106,12 @@ class MappingBackEnd():
         for i in range(0, self._nrimages-1):
             for j in range(i+1, self._nrimages):
                 matches = self.load_matches(i, j)
+                bad_essential, matches = self.ransac_filter_keypoints(
+                    matches, i, j)
+                if bad_essential:
+                    print(
+                        "Not enough points to generate essential matrix for image_", i, " and image_", j)
+                    continue
                 for frame_1, keypt_1, frame_2, keypt_2 in matches:
                     dsf.merge(gtsam.IndexPair(frame_1, keypt_1),
                               gtsam.IndexPair(frame_2, keypt_2))
@@ -107,14 +142,17 @@ class MappingBackEnd():
                         bad_matches.add((j, key))
         return bad_matches
 
-    def filter_bad_landmarks(self, landmark_map, dsf):
+    def filter_bad_landmarks(self, landmark_map, dsf, enable):
         """Filter bad landmarks:
             1. landmark observations<3
             2. landmarks with more than one observations in an image.
             3. Features with more than one landmark correspondences"""
 
         # filter bad matches
-        bad_matches = self.find_bad_matches()
+        if enable is True:
+            bad_matches = self.find_bad_matches()
+        else:
+            bad_matches = {}
         bad_key_list = set()
         for bad_match in bad_matches:
             landmark_representative = dsf.find(
