@@ -13,10 +13,12 @@ def run():
     nn_thresh = 0.7
     feature_extract = FeatureExtraction(
         image_directory_path, image_extension, image_size, nn_thresh)
+    # Extract and Save feature information into files
     feature_extract.extract_all_image_features()
-    calibration = Cal3_S2(fx=232.0542, fy=252.8620, s=0,
-                          u0=325.3452, v0=240.2912).matrix()
-    feature_extract.get_all_feature_matches(calibration, 1)
+    # Create matches and save both the information and the images(with matches displayed on the origin images)
+    # calibration = Cal3_S2(fx=232.0542, fy=252.8620, s=0,
+    #                       u0=325.3452, v0=240.2912).matrix()
+    # feature_extract.get_all_feature_matches(calibration, 1)
 
 
 if __name__ == "__main__":
