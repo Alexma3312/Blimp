@@ -205,10 +205,6 @@ class MappingBackEnd():
         # Transfer the point into the world coordinate
         return pose.transform_from(ph)
 
-    # def create_index_sets(self):
-    #     """Create two sets with valid pose and point indices."""
-    #     return pose_indices, point_indices
-
     def create_initial_estimate(self):
         """Create initial estimate with landmark map.
             Parameters:
@@ -216,6 +212,7 @@ class MappingBackEnd():
                 landmark_map - list, A map of landmarks and their correspondence 
         """
         initial_estimate = gtsam.Values()
+
         # Initial estimate for landmarks
         for landmark_idx, observation_list in enumerate(self._landmark_map):
             key_point = observation_list[0][1]
@@ -224,9 +221,17 @@ class MappingBackEnd():
             landmark_3d_point = self.back_projection(
                 key_point, pose, self._depth)
             initial_estimate.insert(P(landmark_idx), landmark_3d_point)
+        # Filter valid poses
+        valid_pose_idices = set()
+        for observation_list in self._landmark_map:
+            for observation in observation_list:
+                pose_idx = observation[0]
+                valid_pose_idices.add(pose_idx)
         # Initial estimate for poses
-        for pose_idx, pose_i in enumerate(self._pose_estimates):
-            initial_estimate.insert(X(pose_idx), pose_i)
+        for pose_idx in valid_pose_idices:
+            initial_estimate.insert(
+                X(pose_idx), self._pose_estimates[pose_idx])
+
         return initial_estimate
 
     def bundle_adjustment(self):
