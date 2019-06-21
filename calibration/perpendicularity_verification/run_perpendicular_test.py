@@ -35,8 +35,13 @@ def run():
     pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
     # Create MappingBackEnd instance
     data_directory = 'calibration/perpendicularity_verification/perpendicular_walls_manual_data/'
+    filter_bad_landmarks_enable = True
+    min_obersvation_number = 2
+    prob = 0.9
+    threshold = 3
+    backprojection_depth = 2
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise, 2, 2)
+                              pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number, prob, threshold, backprojection_depth)
     # Bundle Adjustment
     tic_ba = time.time()
     sfm_result1 = back_end.bundle_adjustment()
@@ -45,11 +50,13 @@ def run():
 
     # Create MappingBackEnd instance
     data_directory = 'calibration/perpendicularity_verification/perpendicular_walls_data/'
+    filter_bad_landmarks_enable = True
     min_obersvation_number = 3
-    filter_bad_landmarks_enable = False
-    backprojection_depth = 3
+    prob = 0.999
+    threshold = 1
+    backprojection_depth = 10
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number, backprojection_depth)
+                              pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number, prob, threshold, backprojection_depth)
     # Bundle Adjustment
     tic_ba = time.time()
     sfm_result2 = back_end.bundle_adjustment()
