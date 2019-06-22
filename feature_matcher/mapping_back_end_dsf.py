@@ -10,6 +10,8 @@ import cv2
 import numpy as np
 
 import gtsam
+from feature_matcher.mapping_result_helper import (save_map_to_file,
+                                                   save_poses_to_file)
 from feature_matcher.parser import get_matches, load_features
 from gtsam import (  # pylint: disable=wrong-import-order,ungrouped-imports
     Point2, Point3, Pose3, symbol)
@@ -54,7 +56,7 @@ class MappingBackEnd():
         # Store all features and descriptors
         self._image_features = [self.load_features(
             image_index)[0] for image_index in range(self._nrimages)]
-        self.image_descriptors = [self.load_features(
+        self._image_descriptors = [self.load_features(
             image_index)[1] for image_index in range(self._nrimages)]
         landmark_map, dsf = self.create_landmark_map()
         self._landmark_map = self.filter_bad_landmarks(
@@ -209,7 +211,7 @@ class MappingBackEnd():
         """Create initial estimate with landmark map.
             Parameters:
                 pose_estimates - list, pose estimates by measurements
-                landmark_map - list, A map of landmarks and their correspondence 
+                landmark_map - list, A map of landmarks and their correspondence
         """
         initial_estimate = gtsam.Values()
 
@@ -222,13 +224,13 @@ class MappingBackEnd():
                 key_point, pose, self._depth)
             initial_estimate.insert(P(landmark_idx), landmark_3d_point)
         # Filter valid poses
-        valid_pose_idices = set()
+        valid_pose_indices = set()
         for observation_list in self._landmark_map:
             for observation in observation_list:
                 pose_idx = observation[0]
-                valid_pose_idices.add(pose_idx)
+                valid_pose_indices.add(pose_idx)
         # Initial estimate for poses
-        for pose_idx in valid_pose_idices:
+        for pose_idx in valid_pose_indices:
             initial_estimate.insert(
                 X(pose_idx), self._pose_estimates[pose_idx])
 
@@ -275,4 +277,53 @@ class MappingBackEnd():
         # Optimization
         optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
         sfm_result = optimizer.optimize()
+        # Check if factor covariances are under constrain
+        marginals = gtsam.Marginals(  # pylint: disable=unused-variable
+            graph, sfm_result)
         return sfm_result
+
+    def get_landmark_descriptor(self, observation_list):
+        """Calculate the normalized average descriptor."""
+        camera_number = len(observation_list)
+        desc_sum = np.zeros((1, 256))
+        for observation in observation_list:
+            pose_idx = observation[0]
+            for i, pose in enumerate(self._image_features[pose_idx]):
+                if pose == observation[1]:
+                    desc_idx = i
+            desc = self._image_descriptors[pose_idx][desc_idx]
+            desc_sum += np.array(desc)
+        desc_average = desc_sum/camera_number
+        desc_normalize = desc_average/np.linalg.norm(desc_average)
+        return desc_normalize[0]
+
+    def get_landmark_map(self):
+        """Get landmark map."""
+        return self._landmark_map
+
+    def save_map_to_file(self, sfm_result):
+        """Save the map result to a file."""
+        sfm_map = []
+        for i, observation_list in enumerate(self._landmark_map):
+            landmark_pt = sfm_result.atPoint3(P(i))
+            descriptor = self.get_landmark_descriptor(
+                observation_list).tolist()
+            landmark = [landmark_pt.x(), landmark_pt.y(), landmark_pt.z()]
+            landmark.extend(descriptor)
+            sfm_map.append(landmark)
+        save_map_to_file(sfm_map, self._basedir)
+
+    def save_poses_to_file(self, sfm_result):
+        """Save poses to file."""
+        valid_pose_indices = set()
+        for observation_list in self._landmark_map:
+            for observation in observation_list:
+                pose_idx = observation[0]
+                valid_pose_indices.add(pose_idx)
+        camera_poses = []
+        for idx in valid_pose_indices:
+            r = sfm_result.atPose3(X(idx)).rotation().matrix()
+            t = sfm_result.atPose3(X(idx)).translation().vector()
+            camera_poses .append([t[0], t[1], t[2], r[0][0], r[0][1], r[0]
+                                  [2], r[1][0], r[1][1], r[1][2], r[2][0], r[2][1], r[2][2]])
+        save_poses_to_file(camera_poses, self._basedir)

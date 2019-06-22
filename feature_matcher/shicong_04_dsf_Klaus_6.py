@@ -36,8 +36,11 @@ def run():
     num_images = 6
     min_obersvation_number = 6
     filter_bad_landmarks_enable = True
+    prob = 0.999
+    threshold = 1
+    backprojection_depth = 20
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number)
+                              pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number, prob, threshold, backprojection_depth)
     # Bundle Adjustment
     tic_ba = time.time()
     sfm_result1 = back_end.bundle_adjustment()

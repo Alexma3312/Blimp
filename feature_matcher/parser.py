@@ -17,12 +17,12 @@ def parse_matches(data, skip_lines=0):
         matches: List of matches
     """
     data = data[skip_lines:]
-    frames = list(map(int, data[0].split(' ')))
+    num_landmarks = list(map(int, data[0].split(' ')))
     num_matches = int(data[1])
     matches = [list(map(int, data[2+idx].split(' ')))
                for idx in range(num_matches)]
 
-    return frames, matches
+    return num_landmarks, matches
 
 
 def get_matches(filename):
@@ -59,9 +59,11 @@ def load_features(filename):
     def extract_desc(idx):
         desc = list(map(float, data[idx].split()))
         return desc[2:]
-
-    keypoints = [extract_kp(idx) for idx in range(1, num_features+1)]
-    descriptors = [extract_desc(idx) for idx in range(1, num_features+1)]
+    skip_line = 1
+    keypoints = [extract_kp(idx)
+                 for idx in range(skip_line, num_features+skip_line)]
+    descriptors = [extract_desc(idx) for idx in range(
+        skip_line, num_features+skip_line)]
 
     return keypoints, descriptors
 
