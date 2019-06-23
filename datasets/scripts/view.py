@@ -1,15 +1,18 @@
+"""View web camera input."""
+# cSpell: disable
+# pylint: disable=no-member, invalid-name
 #!/usr/bin/env python
 import cv2
 
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(0)
 count = 0
 
 
-while(True):
-  
+while True:
+
     ret, frame = cap.read()
 
-    cv2.imshow('image',frame)
+    cv2.imshow('image', frame)
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break

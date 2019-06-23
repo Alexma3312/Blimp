@@ -1,3 +1,4 @@
+"""Save camera capture images."""
 # cSpell: disable
 # pylint: disable=no-member, invalid-name
 import cv2
