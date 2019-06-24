@@ -23,6 +23,13 @@ class TestBackProjection(GtsamTestCase):
         expected = Point3(0, 20, 0)
         self.gtsamAssertEquals(actual, expected)
 
+        fov, width, height = 60, 640, 480
+        calibration = Cal3_S2(fov, width, height)
+        actual = back_projection(calibration, Point2(320, 240), Pose3(
+            Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0), Point3()), 20)
+        expected = Point3(0, 20, 0)
+        self.gtsamAssertEquals(actual, expected)
+
 
 if __name__ == "__main__":
     unittest.main()
