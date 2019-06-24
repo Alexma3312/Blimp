@@ -36,3 +36,8 @@ class Features():
             return result
         else:
             raise StopIteration
+
+    def __eq__(self, other):
+        result = (self.keypoints == other.keypoints) and (
+            self.descriptors == other.descriptors)
+        return result
