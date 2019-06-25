@@ -8,9 +8,6 @@ class Landmarks():
         self.landmarks = landmarks
         self.descriptors = descriptors
         self.keypoints = []
-        assert len(landmarks) == len(
-            descriptors), "Lengths of Landmarks and Descriptors are different."
-        self.length = len(landmarks)
 
     def append(self, landmark, descriptor, keypoint):
         """Add new feature."""
@@ -26,3 +23,9 @@ class Landmarks():
         result = (self.landmarks == other.landmarks) and (
             self.descriptors == other.descriptors)
         return result
+
+    def get_length(self):
+        """Return length"""
+        assert len(self.landmarks) == len(
+            self.descriptors), "Lengths of Landmarks and Descriptors are different."
+        return len(self.landmarks)

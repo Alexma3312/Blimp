@@ -12,9 +12,17 @@ class VideoStreamer():
       1.) USB Webcam.
       2.) A directory of images (files in directory matching 'img_glob').
       3.) A video file, such as an .mp4 or .avi file.
+      Parameters:
+        basedir - "camera" if input is Webcam. directory if input is images or video file.
+        camid - Webcam id
+        height - output image height
+        width - output image width
+        skip - number of frames to skip
+        img_glob - image suffix(extension), e.g. "*.jpg"
+        start_index - the number of frames to jump at the beginning
     """
 
-    def __init__(self, basedir, camid, height, width, skip, img_glob):
+    def __init__(self, basedir, camid, height, width, skip, img_glob,start_index):
         self.cap = []
         self.camera = False
         self.video_file = False
@@ -22,6 +30,7 @@ class VideoStreamer():
         self.sizer = [height, width]
         self.i = 0
         self.skip = skip
+        self.start_index = start_index
         self.maxlen = 1000000
         # If the "basedir" string is the word camera, then use a webcam.
         if basedir in ("camera/" or "camera"):
@@ -86,6 +95,9 @@ class VideoStreamer():
                 print('VideoStreamer: Cannot get image from camera (maybe bad --camid?)')
                 return (None, False)
             # Skip the first all black frame
+            if self.i < self.start_index:
+                self.i += 1
+                return (None, True)
             if self.i < self.skip:
                 self.i += 1
                 return (None, True)
@@ -95,6 +107,7 @@ class VideoStreamer():
                                      interpolation=cv2.INTER_AREA)
             input_image = cv2.cvtColor(input_image, cv2.COLOR_RGB2GRAY)
             input_image = input_image.astype('float')/255.0
+            self.skip += self.skip
         else:
             image_file = self.listing[self.i]
             input_image = self.read_image(image_file, self.sizer)

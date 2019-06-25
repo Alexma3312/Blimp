@@ -6,13 +6,11 @@ Unit tests for trajectory estimator.
 
 import unittest
 
-import numpy as np
-
 from gtsam import Cal3_S2, PinholeCameraCal3_S2, Point2, Point3, Pose3, Rot3
 from gtsam.utils.test_case import GtsamTestCase
-from trajectory_estimator.features import Features
-from trajectory_estimator.landmarks import Landmarks
-from trajectory_estimator.trajectory_estimator import TrajectoryEstimator
+from localization.features import Features
+from localization.landmarks import Landmarks
+from localization.trajectory_estimator import TrajectoryEstimator
 from utilities.back_projection import back_projection
 
 
@@ -46,12 +44,11 @@ class TestTrajectoryEstimator(GtsamTestCase):
         initial_pose = Pose3(wRc, Point3(0, 0, 1.2))
         file_name = ""
         self.calibration = Cal3_S2(fx=1, fy=1, s=0, u0=320, v0=240)
-        distortion = np.array([])
         self.image_size = (640, 480)
         l2_thresh = 0.7
         distance_thresh = [5, 5]
         self.trajectory_estimator = TrajectoryEstimator(
-            initial_pose, file_name, self.calibration, distortion, self.image_size, l2_thresh, distance_thresh)
+            initial_pose, file_name, self.calibration, self.image_size, l2_thresh, distance_thresh)
 
     def test_landmark_projection(self):
         """Test landmark projection."""

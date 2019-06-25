@@ -4,14 +4,16 @@
 import os
 
 import cv2
+import matplotlib.pyplot as plt
 import numpy as np
 
 import gtsam
 from feature_matcher.mapping_result_helper import load_map_from_file
 from gtsam import Point2, Point3, symbol
+from localization.features import Features
+from localization.landmarks import Landmarks
 from SuperPointPretrainedNetwork.demo_superpoint import SuperPointFrontend
-from trajectory_estimator.features import Features
-from trajectory_estimator.landmarks import Landmarks
+from utilities.plotting import plot_trajectory
 from utilities.video_streamer import VideoStreamer
 
 
@@ -28,8 +30,10 @@ def P(j):  # pylint: disable=invalid-name
 class TrajectoryEstimator():
     """Trajectory Estimator"""
 
-    def __init__(self, initial_pose, file_name, calibration, distortion, image_size, l2_threshold, distance_thresh):
+    def __init__(self, initial_pose, directory_name, calibration, image_size, l2_threshold, distance_thresh):
         self.initial_pose = initial_pose
+
+        file_name = directory_name+"map.dat"
 
         def load_map(file_name):
             """Load map data from file."""
@@ -42,7 +46,6 @@ class TrajectoryEstimator():
         self.map = load_map(file_name)
         # calibration data type gtsam.Cal3_S2
         self.calibration = calibration
-        self.distortion = distortion
         self.width = image_size[0]
         self.height = image_size[1]
         self.l2_threshold = l2_threshold
@@ -57,18 +60,25 @@ class TrajectoryEstimator():
         """Check to see if the next frame is a bad frame."""
         return False
 
-    def trajectory_generator(self, input_type, camid, skip, img_glob):
+    def trajectory_generator(self, calibration, distortion, images_input, camid, skip, img_glob, start_index):
         """The top level function, use to generate trajectory.
         Input:
-            initial_pose
+            initial_pose - Pose3 Object
+            calibration - np.array
+            distortion - np.array
+            images_input - "camera" if input is Webcam. directory if input is images or video file.
+            camid - Webcam id
+            skip - number of frames to skip
+            img_glob - image suffix(extension), e.g. "*.jpg"
+            start_index - the number of frames to jump at the beginning
         Output:
-            trajectory
+            trajectory - a list of Pose3 objects
 
         """
         trajectory = [self.initial_pose]
         # This class helps load input images from different sources.
-        vs = VideoStreamer(input_type, camid, self.height,
-                           self.width, skip, img_glob)
+        vs = VideoStreamer(images_input, camid, self.height,
+                           self.width, skip, img_glob, start_index)
         while True:
             # Get a new image.
             frame, status = vs.next_frame()
@@ -78,18 +88,26 @@ class TrajectoryEstimator():
                 continue
 
             # Undistort input image
-            img = cv2.undistort(
-                frame, self.calibration.matrix(), self.distortion)
+            img = cv2.undistort(frame, calibration, distortion)
+            cv2.imshow('image', img)
+            cv2.waitKey(1)
             # Get the previous pose
             pre_pose = trajectory[-1]
             superpoint_features = self.superpoint_generator(img)
+            print("superpoint_features: ", len(superpoint_features.keypoints))
             observed_landmarks = self.landmark_projection(pre_pose)
+            print("observed_landmarks: ", len(observed_landmarks.keypoints))
             observations = self.landmark_association(
                 superpoint_features, observed_landmarks)
+            print("Data association: ", observations)
             current_pose = self.pose_estimate(observations, pre_pose)
             trajectory.append(current_pose)
+            plot_trajectory(self.map.landmarks, trajectory)
 
-        cv2.destoryAllWindows()
+        plt.ioff()
+        plt.show()
+        # cv2.destoryAllWindows()
+        return trajectory
 
     def superpoint_generator(self, image):
         """Use superpoint to extract features in the image
@@ -115,7 +133,7 @@ class TrajectoryEstimator():
             observed_landmarks - A Landmarks Object
         """
         # Check if the atrium map is empty
-        assert self.map.length, "the map is empty"
+        assert self.map.get_length(), "the map is empty"
 
         observed_landmarks = Landmarks([], [])
         for i, landmark_point in enumerate(self.map.landmarks):
@@ -140,7 +158,8 @@ class TrajectoryEstimator():
             observations - [(Point2(), Point3())]
 
         """
-        if superpoint_features.length == 0 or observed_landmarks.length == 0:
+        if superpoint_features.get_length() == 0 or observed_landmarks.get_length() == 0:
+            print("Input data is empty.")
             return [[]]
         if self.l2_threshold < 0.0:
             raise ValueError('\'nn_thresh\' should be non-negative')
@@ -154,8 +173,9 @@ class TrajectoryEstimator():
                 x_diff = abs(superpoint[0] - projected_point[0])
                 y_diff = abs(superpoint[1] - projected_point[1])
                 if(x_diff < self.x_distance_thresh and y_diff < self.y_distance_thresh):
-                # if((x_diff*x_diff+y_diff*y_diff)**0.5 < 2):
+                    # if((x_diff*x_diff+y_diff*y_diff)**0.5 < 2):
                     nearby_feature_indices.append(j)
+            # print("nearby_feature_indices", nearby_feature_indices)
             if nearby_feature_indices == []:
                 continue
 
@@ -170,7 +190,7 @@ class TrajectoryEstimator():
                     key_point = superpoint_features.keypoints[feature_index]
                     landmark = observed_landmarks.landmarks[i]
                     observations.append(
-                        (Point2(key_point[0],key_point[1]), Point3(landmark[0],landmark[1],landmark[2])))
+                        (Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])))
 
         return observations
 
@@ -182,6 +202,8 @@ class TrajectoryEstimator():
         Returns:
             current_pose - gtsam.pose3 Object. The current estimate pose.
         """
+        if len(observations) == 0:
+            print("No observation")
         # Initialize factor graph
         graph = gtsam.NonlinearFactorGraph()
         initial_estimate = gtsam.Values()
@@ -193,6 +215,7 @@ class TrajectoryEstimator():
         # Because the map is known, we use the landmarks from the visible map with nearly zero error as priors.
         point_prior_noise = gtsam.noiseModel_Isotropic.Sigma(3, 0.01)
         for i, observation in enumerate(observations):
+            print(i)
             # Add projection factors with matched feature points
             graph.add(gtsam.GenericProjectionFactorCal3_S2(
                 observation[0], measurement_noise, X(0), P(i), self.calibration))
@@ -208,6 +231,7 @@ class TrajectoryEstimator():
         optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
         result = optimizer.optimize()
         # Add current pose to the trajectory
-        current_pose = result.atPose3(symbol(ord('x'), 0))
+        current_pose = result.atPose3(X(0))
+        print(current_pose)
 
         return current_pose

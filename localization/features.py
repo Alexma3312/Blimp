@@ -15,9 +15,6 @@ class Features():
     def __init__(self, keypoints, descriptors):
         self.keypoints = keypoints
         self.descriptors = descriptors
-        assert len(keypoints) == len(
-            descriptors), "Lengths of Keypoints and Descriptors are different."
-        self.length = len(self.keypoints)
 
     def append(self, keypoint, descriptor):
         """Add new feature."""
@@ -29,7 +26,7 @@ class Features():
         return self
 
     def __next__(self):
-        if self.index < self.length:
+        if self.index < self.get_length():
             result = Feature(
                 self.keypoints[self.index], self.descriptors[self.index])
             self.index += 1
@@ -41,3 +38,9 @@ class Features():
         result = (self.keypoints == other.keypoints) and (
             self.descriptors == other.descriptors)
         return result
+
+    def get_length(self):
+        """Return length"""
+        assert len(self.keypoints) == len(
+            self.descriptors), "Lengths of Keypoints and Descriptors are different."
+        return len(self.keypoints)
