@@ -9,6 +9,9 @@ from gtsam import Cal3_S2, Point3, Pose3, Rot3
 from localization.trajectory_estimator import TrajectoryEstimator
 import unittest
 from gtsam.utils.test_case import GtsamTestCase
+from utilities.plotting import plot_trajectory_verification
+from feature_matcher.mapping_result_helper import load_poses_from_file
+
 
 class TestInitialPoseRecover(GtsamTestCase):
     """Unit tests for initial pose recover."""
@@ -42,6 +45,8 @@ class TestInitialPoseRecover(GtsamTestCase):
             distort_calibration, distortion, self.directory_name, camid, skip, img_glob, start_index)
         for pose in trajectory:
             print(pose)
+        actual_poses = load_poses_from_file(self.directory_name+"poses.dat")
+        plot_trajectory_verification(self.trajectory_estimator.map.landmarks, actual_poses, trajectory)
 
         self.gtsamAssertEquals(trajectory[-1], self.initial_pose, tol=0.1)
 
