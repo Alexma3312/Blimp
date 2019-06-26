@@ -9,7 +9,8 @@ import numpy as np
 from gtsam import Point2, Point3, Pose3, Rot3, symbol
 
 import torch
-from atrium_control.mapping_and_localization_data import Features, Map
+from atrium_control.feature import Features
+from atrium_control.map import Map
 from sfm import sfm_data
 from SuperPointPretrainedNetwork.demo_superpoint import *
 
@@ -84,8 +85,13 @@ class TrajectoryEstimator(object):
         self.image_width = 640
         self.image_height = 480
         self.fov_in_degrees = 128
-        self.calibration = gtsam.Cal3_S2(
-            self.fov_in_degrees, self.image_width, self.image_height)
+        self.calibration = gtsam.Cal3_S2(fx=333.4, fy=314.7,s=0,u0=303.6, v0=247.6)
+        # gtsam.Cal3_S2(
+        #     self.fov_in_degrees, self.image_width, self.image_height)
+        self.distortion = np.array([-0.282548, 0.054412, -0.001882, 0.004796, 0.000000])
+
+        self.projection = np.array([[226.994629 ,0.000000, 311.982613, 0.000000],[0.000000, 245.874146, 250.410089, 0.000000],[0.000000, 0.000000, 1.000000, 0.000000]])
+
 
         self.atrium_map = atrium_map
         self.downsample_w = downsample_width
@@ -93,11 +99,19 @@ class TrajectoryEstimator(object):
         self.l2_threshold = l2_thresh
         self.distance_threshold = distance_thresh
 
+    def undistort_points(self, points):
+        output = np.array([], dtype=np.float).reshape(0,2)
+        rectification = np.identity(3)
+        undistort_points = cv2.undistortPoints(np.expand_dims(points, axis=1), cameraMatrix=self.calibration.matrix(), distCoeffs=self.distortion, P=self.projection)
+        for j,point in enumerate(undistort_points):
+            output = np.vstack((output,point))
+        return output
+
     def superpoint_generator(self, image):
         """Use superpoint to extract features in the image
         Returns:
             superpoint - Nx2 (gtsam.Point2) numpy array of 2D point observations.
-            descriptors - Nx256 numpy array of corresponding unit normalized descriptorss.
+            descriptors - Nx256 numpy array of corresponding unit normalized descriptors.
 
         Refer to /SuperPointPretrainedNetwork/demo_superpoint for more information about the parameters
         Output of SuperpointFrontend.run():
@@ -113,7 +127,8 @@ class TrajectoryEstimator(object):
         superpoints, descriptors, _ = fe.run(image)
 
         # Transform superpoints from 3*N numpy array to N*2 numpy array
-        superpoints = np.transpose(superpoints[:2, ])
+        superpoints = 4*np.transpose(superpoints[:2, ])
+        superpoints=self.undistort_points(superpoints)
 
         # Transform descriptors from 256*N numpy array to N*256 numpy array
         descriptors = np.transpose(descriptors)
@@ -139,7 +154,6 @@ class TrajectoryEstimator(object):
         points = []
         descriptors = []
         map_indices = []
-
         for i, landmark_point in enumerate(self.atrium_map.landmark_list):
             camera = gtsam.PinholeCameraCal3_S2(pose, self.calibration)
             # feature is gtsam.Point2 object
@@ -151,9 +165,11 @@ class TrajectoryEstimator(object):
                 points.append(feature_point)
                 descriptors.append(self.atrium_map.get_descriptor_from_list(i))
                 map_indices.append(i)
-
         return Features(np.array(points), np.array(descriptors)), map_indices
 
+    def data_association_distance(self):
+        return
+        
     def data_association(self, superpoint_features, projected_features, map_indices):
         """ Associate Superpoint feature points with landmark points by matching all superpoint features with projected features.
         Parameters:
@@ -183,39 +199,49 @@ class TrajectoryEstimator(object):
         matched_landmark_points = []
         matched_landmark_decriptors = []
 
-        for i, superpoint in enumerate(superpoint_features.key_point_list):
+        for i, projected_point in enumerate(projected_features.key_point_list):
 
             feature_index_list = []
             min_score = self.l2_threshold
             matched_landmark_idx = 0
 
             # Calculate the pixels distances between current superpoint and all the points in the map
-            for j, projected_point in enumerate(projected_features.key_point_list):
+            for j, superpoint in enumerate(superpoint_features.key_point_list):
+
+                # print('x',abs(superpoint.x() - projected_point.x()))
+                # print('y',abs(superpoint.y() - projected_point.y()))
+                x_diff = abs(superpoint.x() - projected_point.x())
+                y_diff = abs(superpoint.y() - projected_point.y())
                 if(abs(superpoint.x() - projected_point.x()) < self.distance_threshold and abs(superpoint.y() - projected_point.y()) < self.distance_threshold):
                     feature_index_list.append(j)
-
+                    # print('diff',i,j,x_diff,y_diff)
+            if feature_index_list == []:
+                continue
+            # print(feature_index_list)
             for feature_index in feature_index_list:
                 # Compute L2 distance. Easy since vectors are unit normalized.
                 dmat = np.dot(superpoint_features.descriptor(
-                    i), projected_features.descriptor(feature_index).T)
+                    feature_index), projected_features.descriptor(i).T)
                 dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
+                # print("dmat",i ,feature_index,dmat)
 
                 # Select the minimal L2 distance point
-                if dmat < min_score:
+                if dmat < min_score and dmat>0.8:
                     min_score = dmat
                     matched_landmark_idx = feature_index
 
             # Append feature and landmark if the L2 distance satisfy the L2 threshold.
             if min_score < self.l2_threshold:
                 matched_features_points.append(
-                    superpoint_features.get_keypoint_from_list(i))
+                    superpoint_features.get_keypoint_from_list(matched_landmark_idx))
                 matched_features_descriptors.append(
-                    superpoint_features.get_descriptor_from_list(i))
+                    superpoint_features.get_descriptor_from_list(matched_landmark_idx))
 
                 matched_landmark_points.append(
-                    self.atrium_map.get_landmark_from_list(map_indices[matched_landmark_idx]))
+                    self.atrium_map.get_landmark_from_list(map_indices[i]))
                 matched_landmark_decriptors.append(
-                    self.atrium_map.get_descriptor_from_list(map_indices[matched_landmark_idx]))
+                    self.atrium_map.get_descriptor_from_list(map_indices[i]))
+            # print(matched_features_points)
         return Features(np.array(matched_features_points), np.array(matched_features_descriptors)), Map(np.array(matched_landmark_points), np.array(matched_landmark_decriptors))
 
     def trajectory_estimator(self, features, visible_map):
@@ -255,6 +281,7 @@ class TrajectoryEstimator(object):
         # Because the map is known, we use the landmarks from the visible map with nearly zero error as priors.
         pointPriorNoise = gtsam.noiseModel_Isotropic.Sigma(3, 0.01)
         for i, landmark in enumerate(visible_map.landmark_list):
+            
             graph.add(gtsam.PriorFactorPoint3(P(i),
                                               landmark, pointPriorNoise))
             initialEstimate.insert(P(i), landmark)

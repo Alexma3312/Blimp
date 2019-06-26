@@ -39,7 +39,6 @@ SfM includes:
 1. Source & Test
 
 - `atrium_control/trajectory_estimator.py`: Trajectory Estimate GTSAM solution module 
-- `atrium_control/mapping_and_localization_data.py`: Create Feature and Map data structure for trajectory estimates
 - `tests/test_trajectory_estimator`: module test of `Trajectory Estimator`
 
 2. Data

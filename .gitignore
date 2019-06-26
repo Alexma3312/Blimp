@@ -1,0 +1,10 @@
+*.jpg
+*.csv
+# *.pyc
+# *.bin
+# *.ipch
+__pycache__/
+.vscode/
+*.dat
+*.key
+datasets/scripts/*.py

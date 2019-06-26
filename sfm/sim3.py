@@ -1,4 +1,3 @@
-from sfm import sfm_data
 """This is a three dimensional Similarity Transformation module"""
 import math
 import unittest
@@ -43,10 +42,74 @@ class Similarity3(object):
             self._R.rotate(pose.translation()).vector() + self._t.vector()
         return Pose3(R, Point3(translation))
 
+    def sim3_pose(self, pose_pairs):
+        """
+        Generate similarity transform with Pose3 pairs.
+        Parameters:
+            pose_pairs: N*2 list of Pose3 objects
 
+        Step 1. Calculate rotation matrix
+        R_d = R*R_s
+        J = /sum_i norm(R_d_i - R_i*R_s_i), J=0
+        /sum_i R_i = /sum_i R_d_i*R_s_i.T
+        R:  R = (/sum_i Rd * Rs.T) / n
+
+        Step 2. Calculate scale 
+        2.1 calculate centroid
+        2.2 calculate scale
+        s:
+          t = td_i - s*R*ts_i ,  t = cd_i - s*R*cs_i
+          d_ts_i = ts_i - cs_i, d_td_i = td_i - cd_i
+          Hence, s*(R*d_ts) = d_td
+          s = (/sum_i d_td_i) / (/sum_j (R*d_ts)_j) 
+
+        Step 3. Calculate translation
+            t = cq - sR*cp
+        """
+        n = len(pose_pairs)
+        assert n >= 2  # we need at least two pairs
+        R = np.zeros((3, 3))
+
+        s_center = np.zeros(3)
+        d_center = np.zeros(3)
+        for pose_pair in pose_pairs:
+            R += np.dot(pose_pair[1].rotation().matrix(),
+                        pose_pair[0].rotation().matrix().T)
+            s_center += np.array(pose_pair[0].translation().vector())
+            d_center += np.array(pose_pair[1].translation().vector())
+        s_center /= n
+        d_center /= n
+        R /= n
+
+        x = np.zeros((1,1))
+        y = np.zeros((1,1))
+        for pose_pair in pose_pairs:
+            d_ts = pose_pair[0].translation().vector() - s_center
+            R_ts = np.dot(R,d_ts)
+            d_td = pose_pair[1].translation().vector() - d_center
+
+            x = np.vstack((x,R_ts.reshape(3,1)))
+            y = np.vstack((y,d_td.reshape(3,1)))
+
+        # # Cited from https://docs.scipy.org/doc/numpy/reference/generated/numpy.linalg.lstsq.html
+        # # We can rewrite the line equation as y = Ap, where A = [[x 1]] and p = [[m], [c]].
+        # # Now use lstsq to solve for p:
+        A = np.hstack([x, np.ones((len(x),1))])
+        m, c = np.linalg.lstsq(A, y, rcond=-1)[0]
+        s = m
+
+        # calculate translation
+        t = d_center - np.dot(s*R,s_center)
+
+        self._R = Rot3(R)
+        self._t = Point3(t)
+        self._s = s
+        print(self._R)
+        print(self._t)
+        print(self._s)
 
 # unfinished
-    def align_point(self, point_pairs):
+    def sim3_point(self, point_pairs):
         """
         Generate similarity transform with Point3 pairs.
         """
@@ -60,7 +123,7 @@ class Similarity3(object):
             s_center = Point3(
                 s_center.x() + point_pair[0].x(), s_center.y() + point_pair[0].y(), s_center.z() + point_pair[0].z())
             d_center = Point3(
-                d_center.x() + point_pair[1].x(), d_center.y() + point_pair[1].y(),d_center.z() + point_pair[1].z())
+                d_center.x() + point_pair[1].x(), d_center.y() + point_pair[1].y(), d_center.z() + point_pair[1].z())
         f = 1.0/n
         s_center = Point3(s_center.x()*f, s_center.y()*f, s_center.z()*f)
         d_center = Point3(d_center.x()*f, d_center.y()*f, d_center.z()*f)
@@ -156,7 +219,7 @@ class TestSimilarity2(unittest.TestCase):
         # Create the destination map
         self.d_map = (d_poses, d_points)
 
-    def assert_gtsam_equals(self, actual, expected, tol=1e-2):
+    def assert_gtsam_equals(self, actual, expected, tol=1e-6):
         """Helper function that prints out actual and expected if not equal."""
         equal = actual.equals(expected, tol)
         if not equal:
@@ -191,10 +254,37 @@ class TestSimilarity2(unittest.TestCase):
         for i, pose in enumerate(actual_poses):
             self.assert_gtsam_equals(expected_poses[i], pose)
 
+    def test_align_pose(self):
+        """Test generating similarity transform with Pose3 pairs."""
+        # Create expected sim3
+        expected_R = Rot3.Ry(math.radians(180))
+        expected_s = 2
+        expected_t = Point3(4, 6, 10)
 
+        # Create source poses
+        s_pose1 = Pose3(
+            Rot3(np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])), Point3(0, 0, 0))
+        s_pose2 = Pose3(
+            Rot3(np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]])), Point3(4, 0, 0))
+
+        # Create destination poses
+        d_pose1 = Pose3(
+            Rot3(np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])), Point3(4, 6, 10))
+        d_pose2 = Pose3(
+            Rot3(np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])), Point3(-4, 6, 10))
+
+        # Align
+        pose_pairs = [[s_pose1, d_pose1], [s_pose2, d_pose2]]
+        sim3 = Similarity3()
+        sim3.align_pose(pose_pairs)
+
+        # Check actual sim3 equals to expected sim3
+        expected_R.equals(sim3._R, 0.01)
+        self.assertAlmostEqual(sim3._s, expected_s, delta=0.01)
+        self.assert_gtsam_equals(sim3._t, expected_t)
 
     # Unfinished
-    def test_align_point(self):
+    def test_sim3_point(self):
         """Test generating similarity transform with Point3 pairs."""
         s_point1 = Point3(1, 1, 0)
         s_point2 = Point3(1, 3, 0)
@@ -206,6 +296,37 @@ class TestSimilarity2(unittest.TestCase):
 
         point_pairs = [[s_point1, d_point1], [
             s_point2, d_point2], [s_point3, d_point3]]
+    
+    def test_sim3_pose(self):
+        """Test generating similarity transform with Pose3 pairs."""
+        # Create expected sim3
+        expected_R = Rot3.Ry(math.radians(180))
+        expected_s = 2
+        expected_t = Point3(4, 6, 10)
+        print(expected_R)
+
+        # Create source poses
+        s_pose1 = Pose3(
+            Rot3(np.array([[1, 0, 0], [0, 1, 0], [0, 0, 1]])), Point3(0, 0, 0))
+        s_pose2 = Pose3(
+            Rot3(np.array([[-1, 0, 0], [0, 1, 0], [0, 0, 1]])), Point3(4, 0, 0))
+
+        # Create destination poses
+        d_pose1 = Pose3(
+            Rot3(np.array([[-1, 0, 0], [0, 1, 0], [0, 0, -1]])), Point3(4, 6, 10))
+        d_pose2 = Pose3(
+            Rot3(np.array([[1, 0, 0], [0, 1, 0], [0, 0, -1]])), Point3(-4, 6, 10))
+
+        # Align
+        pose_pairs = [[s_pose1, d_pose1], [s_pose2, d_pose2]]
+        sim3 = Similarity3()
+        sim3.sim3_pose(pose_pairs)
+
+        # Check actual sim3 equals to expected sim3
+        assert(expected_R.equals(sim3._R, 1e-6))
+        self.assertAlmostEqual(sim3._s, expected_s, delta=1e-6)
+        self.assert_gtsam_equals(sim3._t, expected_t)
+
 
 if __name__ == "__main__":
     unittest.main()

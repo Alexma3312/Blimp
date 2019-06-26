@@ -6,7 +6,8 @@ import gtsam
 import numpy as np
 from gtsam import Point2, Point3, Pose3, Rot3
 
-from atrium_control.mapping_and_localization_data import Features, Map
+from atrium_control.feature import Features
+from atrium_control.map import Map
 
 
 def create_atrium_map():

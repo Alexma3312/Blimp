@@ -8,11 +8,18 @@ Welcome to the Blimp's GitHub page!
 
 This project is a front end vision and control system than can be deployed on a laptop or a ground station to control a group of autonomous blimps.
 
+<div align="center">
+  <img src="docs/images/man.gif" width="100" />
+  <img src="docs/images/track.png" width="400" /> 
+  <img src="docs/images/blimp.png" width="150" />
+</div>
+
 ## Project Objective:
 
 * Offline Mapping with SfM
 * Real-time localization
 * Path tracking
+* Pose Estimation
 
 ## Hardware Setup
 

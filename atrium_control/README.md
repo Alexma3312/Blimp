@@ -13,4 +13,3 @@
 
 ## Explaination
 
-1. `mapping_and_localization_data` contains data structure for trajectory estimator
