@@ -36,8 +36,8 @@ def run():
     num_images = 6
     min_obersvation_number = 6
     filter_bad_landmarks_enable = True
-    prob = 0.999
-    threshold = 1
+    prob = 0.9
+    threshold = 3
     backprojection_depth = 20
     back_end = MappingBackEnd(data_directory, num_images, calibration,
                               pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number, prob, threshold, backprojection_depth)
@@ -46,6 +46,9 @@ def run():
     sfm_result1 = back_end.bundle_adjustment()
     toc_ba = time.time()
     print('BA spents ', toc_ba-tic_ba, 's')
+    # Save map data
+    back_end.save_map_to_file(sfm_result1)
+    back_end.save_poses_to_file(sfm_result1)
 
     #"""Use Superpoint matching"""
     # Create MappingBackEnd instance
@@ -63,6 +66,7 @@ def run():
 
     # # Plot Result
     plot_with_results(sfm_result1, sfm_result2, 30, 30, 30)
+    
 
 
 if __name__ == "__main__":

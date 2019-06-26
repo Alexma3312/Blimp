@@ -45,7 +45,7 @@ def run():
     data_directory = 'feature_matcher/library_data/library_4X8/undistort_images/features/'
     num_images = 34
     filter_bad_landmarks_enable = True
-    min_obersvation_number = 2
+    min_obersvation_number = 3
     prob = 0.9
     threshold = 3
     backprojection_depth = 2
