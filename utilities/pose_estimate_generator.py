@@ -8,12 +8,23 @@ import numpy as np
 from gtsam import Point3, Pose3, Rot3
 
 
-def pose_estimate_generator(theta, delta_x, delta_y, delta_z, prior1_delta, prior2_delta, rows, cols, angles):
-    """Generate pose estimates for mapping."""
+def pose_estimate_generator(theta, delta_x, delta_y, delta_z, prior1_delta, prior2_delta, rows, cols, angles, wRw2=np.identity(3)):
+    """Generate pose estimates for mapping.
+        Parameters:
+            theta - int, angle of rotation
+            delta_x - int, delta distance along x axis
+            delta_y - int, delta distance along y axis
+            delta_z - int, height
+            prior1_delta - list, [x,y,z,rotation angle]
+            prior2_delta - list, [x,y,z,rotation angle]
+            rows - int, number of rows
+            cols - int, number of columns
+            angles - int, number of angles
+            wRw2 - numpy array, rotation of the pose estimate grid
+    """
     # Camera to world rotation
     wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0).matrix()
-    theta = 360/angles
-    # theta = 45
+    wRc = Rot3(np.dot(wRc, wRw2)).matrix()
 
     def image_pose(i):
         y_idx = i // (cols*angles)
