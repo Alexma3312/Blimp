@@ -56,6 +56,10 @@ class FeatureExtraction(object):
         grayim = cv2.imread(impath, color)
         if grayim is None:
             raise Exception('Error reading image %s' % impath)
+        # Image is resized via opencv.
+        interp = cv2.INTER_AREA
+        grayim = cv2.resize(
+            grayim, (self.img_size[0], self.img_size[1]), interpolation=interp)
         grayim = (grayim.astype('float32') / 255.)
         return grayim
 
@@ -81,7 +85,7 @@ class FeatureExtraction(object):
         print('==> Processing Image Directory Input.')
         search = os.path.join(self.basedir, self.img_extension)
         img_paths = glob.glob(search)
-        img_paths.sort()
+        img_paths.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
         print("Number of Images: ", len(img_paths))
         maxlen = len(img_paths)
         if maxlen == 0:
@@ -110,7 +114,7 @@ class FeatureExtraction(object):
         if not os.path.exists(dir_name):
             os.mkdir(dir_name)
         # np.savetxt(dir_name+self.leading_zero(index) +
-        #            '.key', features, fmt='%.4f')        
+        #            '.key', features, fmt='%.4f')
         np.savetxt(dir_name+self.leading_zero(index) +
                    '.key', features)
 
@@ -180,10 +184,11 @@ class FeatureExtraction(object):
                     grayim_2)
                 matches = self.point_tracker.nn_match_two_way(
                     descriptors_1.T, descriptors_2.T, self.nn_thresh)
-                bad_essential_matrix, good_matches = self.ransac_filter(
+                bad_essential_matrix, good_matches = self.ransac_filter_opencv(
                     matches, keypoints_1, keypoints_2, threshold, calibration)
                 if bad_essential_matrix:
-                    print("Not enough points to generate essential matrix for image_", i, " and image_", j)
+                    print(
+                        "Not enough points to generate essential matrix for image_", i, " and image_", j)
                     continue
                 print("Matches between image {} and image {} (ransac filter/two way NN matches): ".format(i, j),
                       good_matches.shape[0], "/", matches.shape[1])
@@ -191,7 +196,7 @@ class FeatureExtraction(object):
                 self.save_match_images(
                     i, j, good_matches, keypoints_1, keypoints_2)
 
-    def ransac_filter(self, matches, keypoints_1, keypoints_2, threshold, calibration):
+    def ransac_filter_opencv(self, matches, keypoints_1, keypoints_2, threshold, calibration):
         """Use opencv ransac to filter matches."""
         src = np.array([], dtype=np.float).reshape(0, 2)
         dst = np.array([], dtype=np.float).reshape(0, 2)
@@ -199,13 +204,16 @@ class FeatureExtraction(object):
             src = np.vstack((src, keypoints_1[int(match[0])]))
             dst = np.vstack((dst, keypoints_2[int(match[1])]))
 
-        if src.shape[0] < 6:
+        if src.shape[0] < 20:
             return True, np.array([])
 
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
-        _, mask = cv2.findEssentialMat(
-            dst, src, cameraMatrix=calibration, method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        # _, mask = cv2.findEssentialMat(
+        #     dst, src, cameraMatrix=calibration, method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        fundamental_mat, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 1, 0.99)
+        if mask is None:
+            return True, np.array([])
         good_matches = [matches.T[i]
                         for i, score in enumerate(mask) if score == 1]
         good_matches = np.array(good_matches)[:, :2]
@@ -272,5 +280,6 @@ class FeatureExtraction(object):
                 # Get intersecting rows across two 2D numpy arrays
                 new_matches = np.array(
                     [x for x in set(tuple(x) for x in matches) & set(tuple(x) for x in matches_4d)])
-                print("matches:",matches.shape,"matches_4d:",matches_4d.shape,'new_matches:',new_matches.shape)
+                print("matches:", matches.shape, "matches_4d:",
+                      matches_4d.shape, 'new_matches:', new_matches.shape)
                 self.save_feature_matches(i, j, new_matches, "new_matches/")
