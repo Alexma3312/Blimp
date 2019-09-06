@@ -1,6 +1,7 @@
 # Mapping Process Tutorial
 
-Follow the steps below to perform SfM.
+Follow the steps below to perform SfM. 
+**This tutorial shows how to use JING'S 4D agriculture feature association (C++) as front end together with this repo's backend optimization.** 
 
 ## 1. Collect data
 
