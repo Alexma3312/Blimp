@@ -103,19 +103,20 @@ class TestCameraCalibration(unittest.TestCase):
 
     def test_reprojection(self):
         """test reprojection for for distort images"""
-        undist = 0
+        undist_flag = 0
         landmarks, poses = bundle_adjustment(
-            self.calib.cal, self.calib.kp1, self.calib.kp2, undist)
-        actual_error = self.calib.reprojection_error(landmarks, poses, undist)
+            self.calib.cal, self.calib.kp1, self.calib.kp2, undist_flag)
+        actual_error = self.calib.reprojection_error(landmarks, poses, undist_flag)
         print("Distort_reprojection_error:", actual_error)
         self.assertAlmostEqual(actual_error, 0, delta=0.05)
 
     def test_reprojection_undistort(self):
         """test reprojection for undistort images"""
-        undist = 1
+        undist_flag = 1
         landmarks, poses = bundle_adjustment(
-            self.calib.cal_undist, self.calib.kp1_undist, self.calib.kp2_undist, undist)
-        actual_error = self.calib.reprojection_error(landmarks, poses, undist)
+            self.calib.cal_undist, self.calib.kp1_undist, self.calib.kp2_undist, undist_flag)
+            # self.calib.cal, self.calib.kp1_undist, self.calib.kp2_undist, undist_flag)
+        actual_error = self.calib.reprojection_error(landmarks, poses, undist_flag)
         print("Undistort_reprojection_error:", actual_error)
         self.assertAlmostEqual(actual_error, 0, delta=0.06)
 
