@@ -33,12 +33,13 @@ def run():
 
     #"""Use 4D agri matching"""
     data_directory = 'feature_matcher/Klaus_4d_agri_match_data/'
+    # data_directory = 'feature_matcher/check/'
     num_images = 6
     min_obersvation_number = 6
     filter_bad_landmarks_enable = True
     prob = 0.9
     threshold = 3
-    backprojection_depth = 20
+    backprojection_depth = 15
     back_end = MappingBackEnd(data_directory, num_images, calibration,
                               pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number, prob, threshold, backprojection_depth)
     # Bundle Adjustment
@@ -55,9 +56,9 @@ def run():
     data_directory = 'feature_matcher/Klaus_Superpoint_match_data/'
     # data_directory = 'feature_matcher/Klaus_filter_match_data/'
     num_images = 6
-    min_obersvation_number = 3
+    min_obersvation_number = 6
     back_end = MappingBackEnd(data_directory, num_images, calibration,
-                              pose_estimates, measurement_noise, pose_prior_noise, min_obersvation_number)
+                              pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable, min_obersvation_number, prob, threshold, backprojection_depth)
     # Bundle Adjustment
     tic_ba = time.time()
     sfm_result2 = back_end.bundle_adjustment()

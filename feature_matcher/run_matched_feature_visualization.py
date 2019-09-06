@@ -8,8 +8,8 @@ from utilities.visualize_matched_features import visualize_matched_features
 
 def run():
     """Execution"""
-    basedir = "feature_matcher/Klaus_Auditorium_data/"
-    number_images = 98
+    basedir = "feature_matcher/match_visulize/"
+    number_images = 14
     visualize_matched_features(basedir, number_images)
 
 
