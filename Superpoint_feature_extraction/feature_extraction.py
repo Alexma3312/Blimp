@@ -209,9 +209,16 @@ class FeatureExtraction(object):
 
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
-        # _, mask = cv2.findEssentialMat(
-        #     dst, src, cameraMatrix=calibration, method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        E, mask = cv2.findEssentialMat(
+            dst, src, cameraMatrix=calibration, method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        print("E:\n",E)
+        R1, R2, T = cv2.decomposeEssentialMat(E)
+        print("R1:\n",R1)
+        print("R2:\n",R2)
+        print("T:\n",T)
         fundamental_mat, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 1, 0.99)
+        print("fundamental_mat:\n",fundamental_mat)
+
         if mask is None:
             return True, np.array([])
         good_matches = [matches.T[i]
