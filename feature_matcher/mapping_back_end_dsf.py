@@ -64,7 +64,6 @@ class MappingBackEnd():
 
     def load_features(self, image_index):
         """ Load features from .key files
-            features - keypoints:A N length list of gtsam.Point2(x,y). Descriptors: A Nx256 list of descriptors.
         """
         feat_file = os.path.join(
             self._basedir, "{0:07}.key".format(image_index))
@@ -97,8 +96,12 @@ class MappingBackEnd():
 
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
-        _, mask = cv2.findEssentialMat(
-            dst, src, cameraMatrix=self._calibration.matrix(), method=cv2.RANSAC, prob=self._cv_prob, threshold=self._cv_threshold)
+        # _, mask = cv2.findEssentialMat(
+        #     dst, src, cameraMatrix=self._calibration.matrix(), method=cv2.RANSAC, prob=self._cv_prob, threshold=self._cv_threshold)
+        _, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 0.01, 0.999)
+        if mask is None:
+            return True, np.array([])
+        
         good_matches = [matches[i]
                         for i, score in enumerate(mask) if score == 1]
         return False, good_matches
@@ -222,6 +225,9 @@ class MappingBackEnd():
             pose = self._pose_estimates[pose_idx]
             landmark_3d_point = self.back_projection(
                 key_point, pose, self._depth)
+            # To test indeterminate system
+            # if(landmark_idx == 477 or landmark_idx == 197 or landmark_idx == 204 or landmark_idx == 458 or landmark_idx == 627 or landmark_idx == 198):
+            #     continue
             initial_estimate.insert(P(landmark_idx), landmark_3d_point)
         # Filter valid poses
         valid_pose_indices = set()
@@ -257,6 +263,9 @@ class MappingBackEnd():
             for obersvation in observation_list:
                 pose_idx = obersvation[0]
                 key_point = obersvation[1]
+                # To test indeterminate system
+                # if(landmark_idx == 477 or landmark_idx == 197 or landmark_idx == 204 or landmark_idx == 458 or landmark_idx == 627 or landmark_idx == 198):
+                #     continue
                 graph.add(gtsam.GenericProjectionFactorCal3_S2(
                     key_point, self._measurement_noise,
                     X(pose_idx), P(landmark_idx), self._calibration))
@@ -275,7 +284,12 @@ class MappingBackEnd():
                 X(idx), pose_i, self._pose_prior_noise))
 
         # Optimization
+        # Using QR rather than Cholesky decomposition
+        # params = gtsam.LevenbergMarquardtParams()
+        # params.setLinearSolverType("MULTIFRONTAL_QR")
+        # optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate, params)
         optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
+
         sfm_result = optimizer.optimize()
         # Check if factor covariances are under constrain
         marginals = gtsam.Marginals(  # pylint: disable=unused-variable
