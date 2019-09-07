@@ -3,7 +3,7 @@
 # pylint: disable = wrong-import-order,no-name-in-module
 import unittest
 
-from Superpoint_feature_extraction.feature_extraction import FeatureExtraction
+from superpoint_descriptor.superpoint_wrapper import SuperpointWrapper
 from gtsam import Cal3_S2
 
 
@@ -11,14 +11,14 @@ class TestFeatureExtraction(unittest.TestCase):
     """Test feature extraction"""
 
     def setUp(self):
-        image_directory_path = 'Superpoint_feature_extraction/undistort_images/'
+        image_directory_path = 'superpoint_descriptor/undistort_images/'
         image_extension = '*.jpg'
         image_size = (640, 480)
         nn_thresh = 0.7
         # Input images(undistorted) calibration
         self.calibration = Cal3_S2(fx=232.0542, fy=252.8620,
                                    s=0, u0=325.3452, v0=240.2912).matrix()
-        self.front_end = FeatureExtraction(
+        self.front_end = SuperpointWrapper(
             image_directory_path, image_extension, image_size, nn_thresh)
 
     def test_leading_zero(self):

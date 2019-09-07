@@ -7,7 +7,7 @@ import numpy as np
 
 from SuperPointPretrainedNetwork.demo_superpoint import (PointTracker,
                                                          SuperPointFrontend)
-from feature_matcher.parser import get_matches
+from mapping.bundle_adjustment.parser import get_matches
 
 # pylint: disable=no-member
 
@@ -29,7 +29,7 @@ MYJET = np.array([[0., 0., 0.5],
                   [0.5, 0., 0.]])
 
 
-class FeatureExtraction(object):
+class SuperpointWrapper(object):
     """Save superpoint extracted features to files."""
 
     def __init__(self, image_directory_path='SuperPointPretrainedNetwork/feature_extraction/undistort_images/', image_extension='*.jpg', image_size=(640, 480), nn_thresh=0.7):
