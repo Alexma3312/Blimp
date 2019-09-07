@@ -2,12 +2,13 @@
 # cSpell: disable
 # pylint: disable=no-member, invalid-name
 import cv2
+from collect_data.scripts.config import video_capture
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(video_capture)
 
 # Define the codec and create VideoWriter object
 fourcc = cv2.VideoWriter_fourcc(*'XVID')
-out = cv2.VideoWriter('datasets/videos/output.avi', fourcc, 20.0, (640, 480))
+out = cv2.VideoWriter('collect_data/videos/output.avi', fourcc, 20.0, (640, 480))
 
 while cap.isOpened():
     ret, frame = cap.read()

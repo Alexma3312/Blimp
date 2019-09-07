@@ -2,8 +2,9 @@
 # cSpell: disable
 # pylint: disable=no-member, invalid-name
 import cv2
+from collect_data.scripts.config import video_capture
 
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(video_capture)
 count = 0
 img_idx = 0
 

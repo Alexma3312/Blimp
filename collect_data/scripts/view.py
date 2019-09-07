@@ -3,8 +3,9 @@
 # pylint: disable=no-member, invalid-name
 #!/usr/bin/env python
 import cv2
+from collect_data.scripts.config import video_capture
 
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(video_capture)
 count = 0
 
 
