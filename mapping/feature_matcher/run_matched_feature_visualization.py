@@ -1,15 +1,14 @@
 # cSpell: disable=invalid-name
-"""Matched Feature Visualization."""
+"""Matched Feature Visualization.
+Use create images with matched features on top of image pairs."""
 # pylint: disable=no-name-in-module, wrong-import-order
-import numpy as np
+from mapping.feature_matcher.myconfig import number_images, basedir
 
 from utilities.visualize_matched_features import visualize_matched_features
 
 
 def run():
     """Execution"""
-    basedir = "feature_matcher/match_visulize/"
-    number_images = 14
     visualize_matched_features(basedir, number_images)
 
 

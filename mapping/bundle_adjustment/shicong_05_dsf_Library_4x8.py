@@ -7,8 +7,8 @@ import time
 import numpy as np
 
 import gtsam
-from feature_matcher.mapping_back_end_dsf import MappingBackEnd
 from gtsam import Cal3_S2  # pylint: disable=ungrouped-imports
+from mapping.bundle_adjustment.mapping_back_end_dsf import MappingBackEnd
 from utilities.plotting import plot_with_result
 from utilities.pose_estimate_generator import pose_estimate_generator
 
@@ -42,10 +42,10 @@ def run():
                                   translation_sigma, translation_sigma, translation_sigma])
     pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
     # Create MappingBackEnd instance
-    data_directory = 'feature_matcher/library_data/library_4X8/undistort_images/features/'
+    data_directory = 'mapping/datasets/library_data/library_4X8/undistort_images/features/'
     num_images = 34
     filter_bad_landmarks_enable = True
-    min_obersvation_number = 2
+    min_obersvation_number = 3
     prob = 0.9
     threshold = 3
     backprojection_depth = 2

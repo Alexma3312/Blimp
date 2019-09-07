@@ -10,9 +10,9 @@ import cv2
 import numpy as np
 
 import gtsam
-from feature_matcher.mapping_result_helper import (save_map_to_file,
-                                                   save_poses_to_file)
-from feature_matcher.parser import get_matches, load_features
+from mapping.bundle_adjustment.mapping_result_helper import (save_map_to_file,
+                                                             save_poses_to_file)
+from mapping.bundle_adjustment.parser import get_matches, load_features
 from gtsam import (  # pylint: disable=wrong-import-order,ungrouped-imports
     Point2, Point3, Pose3, symbol)
 
@@ -96,12 +96,14 @@ class MappingBackEnd():
 
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
-        # _, mask = cv2.findEssentialMat(
-        #     dst, src, cameraMatrix=self._calibration.matrix(), method=cv2.RANSAC, prob=self._cv_prob, threshold=self._cv_threshold)
-        _, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 0.01, 0.999)
+        # Essential Matrix and RANSAC filter
+        _, mask = cv2.findEssentialMat(
+            dst, src, cameraMatrix=self._calibration.matrix(), method=cv2.RANSAC, prob=self._cv_prob, threshold=self._cv_threshold)
+        # Fundamental Matrix and RANSAC filter
+        # _, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 0.01, 0.999)
         if mask is None:
             return True, np.array([])
-        
+
         good_matches = [matches[i]
                         for i, score in enumerate(mask) if score == 1]
         return False, good_matches

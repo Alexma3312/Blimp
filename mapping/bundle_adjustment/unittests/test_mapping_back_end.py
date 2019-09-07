@@ -8,7 +8,7 @@ import unittest
 
 import numpy as np
 
-from feature_matcher.mapping_back_end import (
+from mapping.bundle_adjustment.mapping_back_end import (
     ImageFeature, MappingBackEnd, P, X, transform_from)
 import gtsam
 from gtsam import Cal3_S2, Point2, Point3, Pose3, Rot3, Values
@@ -18,7 +18,7 @@ from gtsam.utils.test_case import GtsamTestCase
 def load_points():
     """load landmark data"""
     pts3d = []
-    with open("feature_matcher/sim_match_data/points.txt") as f:
+    with open("mapping/sim_match_data/points.txt") as f:
         pts = f.readlines()
         num_pts = int(pts[0].strip())
         for i in range(num_pts):
@@ -48,7 +48,7 @@ class TestMappingBackEnd(GtsamTestCase):
                                       translation_sigma, translation_sigma, translation_sigma])
         pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
         # Create MappingBackEnd instance
-        data_directory = 'feature_matcher/sim_match_data/'
+        data_directory = 'mapping/sim_match_data/'
         min_landmark_seen = 3
         self.num_images = 3
         self.back_end = MappingBackEnd(

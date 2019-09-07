@@ -10,8 +10,8 @@ from os import path
 import numpy as np
 
 import gtsam
-from feature_matcher.mapping_back_end_dsf import MappingBackEnd, P, X
-from feature_matcher.mapping_result_helper import (load_map_from_file,
+from mapping.bundle_adjustment.mapping_back_end_dsf import MappingBackEnd, P, X
+from mapping.bundle_adjustment.mapping_result_helper import (load_map_from_file,
                                                    load_poses_from_file)
 from gtsam import (Cal3_S2, Point2,  # pylint: disable=ungrouped-imports
                    Point3, Pose3, Rot3)
@@ -21,7 +21,7 @@ from gtsam.utils.test_case import GtsamTestCase
 def load_points():
     """load landmark data"""
     pts3d = []
-    with open("feature_matcher/sim_match_data/points.txt") as f:
+    with open("mapping/sim_match_data/points.txt") as f:
         pts = f.readlines()
         num_pts = int(pts[0].strip())
         for i in range(num_pts):
@@ -51,7 +51,7 @@ class TestMappingBackEnd(GtsamTestCase):
                                       translation_sigma, translation_sigma, translation_sigma])
         pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
         # Create MappingBackEnd instance
-        self.data_directory = 'feature_matcher/sim_match_data/'
+        self.data_directory = 'mapping/sim_match_data/'
         min_obersvation_number = 2
         filter_bad_landmarks_enable = True
         self.num_images = 3
@@ -90,7 +90,7 @@ class TestMappingBackEnd(GtsamTestCase):
     def test_find_dsf(self):
         """Test functions related to DSF"""
         # """Test find bad matches."""
-        data_directory = 'feature_matcher/dsf_test_data/'
+        data_directory = 'mapping/datasets/dsf_test_data/'
         num_images = 3
         filter_bad_landmarks_enable = False
         min_obersvation_number = 3

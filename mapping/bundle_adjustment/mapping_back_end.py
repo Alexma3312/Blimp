@@ -12,7 +12,7 @@ import cv2
 import numpy as np
 
 import gtsam
-from feature_matcher.parser import get_matches, load_features_list
+from mapping.bundle_adjustment.parser import get_matches, load_features_list
 from gtsam import (  # pylint: disable=wrong-import-order,ungrouped-imports
     Point2, Point3, Pose3, Rot3, symbol)
 

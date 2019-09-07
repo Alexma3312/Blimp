@@ -1,4 +1,4 @@
-"""Run the mapping backend with the simulate data."""
+"""Run the mapping backend with the data from the Klaus auditorium."""
 # cSpell: disable=invalid-name
 # pylint: disable=no-name-in-module,wrong-import-order,no-member,assignment-from-no-return
 
@@ -7,7 +7,7 @@ import time
 import numpy as np
 
 import gtsam
-from feature_matcher.mapping_back_end import MappingBackEnd
+from mapping.bundle_adjustment.mapping_back_end import MappingBackEnd
 from gtsam import Cal3_S2, Point3, Pose3, Rot3  # pylint: disable=ungrouped-imports
 from utilities.plotting import plot_sfm_result
 
@@ -15,12 +15,12 @@ from utilities.plotting import plot_sfm_result
 def run():
     """Execution."""
     # Input images(undistorted) calibration
-    fov, w, h = 60, 1280, 720
-    calibration = Cal3_S2(fov, w, h)
+    calibration = Cal3_S2(
+        fx=232.0542, fy=252.8620, s=0, u0=325.3452, v0=240.2912)
     # Camera to world rotation
     wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # pylint: disable=invalid-name
     # Create pose estimates
-    pose_estimates = [Pose3(wRc, Point3(0, i, 2)) for i in range(3)]
+    pose_estimates = [Pose3(wRc, Point3(1.58*i, 0, 1.2)) for i in range(6)]
     # Create measurement noise for bundle adjustment
     sigma = 1.0
     measurement_noise = gtsam.noiseModel_Isotropic.Sigma(2, sigma)
@@ -31,9 +31,9 @@ def run():
                                   translation_sigma, translation_sigma, translation_sigma])
     pose_prior_noise = gtsam.noiseModel_Diagonal.Sigmas(pose_noise_sigmas)
     # Create MappingBackEnd instance
-    data_directory = 'feature_matcher/sim_match_data/'
-    num_images = 3
-    min_landmark_seen = 3
+    data_directory = 'mapping/datasets/Klaus_4d_agri_match_data/'
+    num_images = 6
+    min_landmark_seen = 6
     back_end = MappingBackEnd(data_directory, num_images, calibration,
                               pose_estimates, measurement_noise, pose_prior_noise, min_landmark_seen)
     # Bundle Adjustment
