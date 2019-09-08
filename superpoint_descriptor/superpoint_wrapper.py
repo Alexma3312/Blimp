@@ -5,9 +5,12 @@ import os
 import cv2
 import numpy as np
 
+from mapping.bundle_adjustment.parser import get_matches
+from superpoint_descriptor.superpoint_config import (conf_thresh, cuda,
+                                                     nms_dist, nn_thresh,
+                                                     weights_path)
 from SuperPointPretrainedNetwork.demo_superpoint import (PointTracker,
                                                          SuperPointFrontend)
-from mapping.bundle_adjustment.parser import get_matches
 
 # pylint: disable=no-member
 
@@ -32,15 +35,15 @@ MYJET = np.array([[0., 0., 0.5],
 class SuperpointWrapper(object):
     """Save superpoint extracted features to files."""
 
-    def __init__(self, image_directory_path='SuperPointPretrainedNetwork/feature_extraction/undistort_images/', image_extension='*.jpg', image_size=(640, 480), nn_thresh=0.7):
+    def __init__(self, image_directory_path='SuperPointPretrainedNetwork/feature_extraction/', image_extension='*.jpg', image_size=(640, 480), nn_thresh=0.7):
         self.basedir = image_directory_path
         self.img_extension = image_extension
         self.nn_thresh = nn_thresh
-        self._fe = SuperPointFrontend(weights_path="SuperPointPretrainedNetwork/superpoint_v1.pth",
-                                      nms_dist=4,
-                                      conf_thresh=0.015,
-                                      nn_thresh=0.7,
-                                      cuda=False)
+        self._fe = SuperPointFrontend(weights_path=weights_path,
+                                      nms_dist=nms_dist,
+                                      conf_thresh=conf_thresh,
+                                      nn_thresh=nn_thresh,
+                                      cuda=cuda)
         self.point_tracker = PointTracker(5, self.nn_thresh)
         self.img_size = image_size
         self.img_paths = self.get_image_paths()
@@ -83,7 +86,8 @@ class SuperpointWrapper(object):
     def get_image_paths(self):
         """Get all image paths within the directory."""
         print('==> Processing Image Directory Input.')
-        search = os.path.join(self.basedir, self.img_extension)
+        search = os.path.join(
+            self.basedir+'undistort_images/', '*'+self.img_extension)
         img_paths = glob.glob(search)
         img_paths.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
         print("Number of Images: ", len(img_paths))
@@ -157,7 +161,7 @@ class SuperpointWrapper(object):
             cv2.putText(out2, 'Raw Point Confidences', FONT_PT,
                         FONT, FONT_SC, FONT_CLR, lineType=16)
 
-        out_dir_1 = self.basedir+'feature_image/'
+        out_dir_1 = self.basedir+'feature_images/'
         if not os.path.exists(out_dir_1):
             os.mkdir(out_dir_1)
         out_file_1 = out_dir_1+'frame_%05d' % index+'.jpg'
@@ -196,6 +200,72 @@ class SuperpointWrapper(object):
                 self.save_match_images(
                     i, j, good_matches, keypoints_1, keypoints_2)
 
+    def get_all_feature_matches_FLANN(self, calibration, ratio_thresh=0.7, threshold=1):
+        """Get feature matches of every two images"""
+        image_number = len(self.img_paths)
+        for i in range(image_number-1):
+            for j in range(i+1, image_number):
+                grayim_1 = self.read_image(self.img_paths[i])
+                grayim_2 = self.read_image(self.img_paths[j])
+                keypoints_1, descriptors_1, _ = self.superpoint_generator(
+                    grayim_1)
+                keypoints_2, descriptors_2, _ = self.superpoint_generator(
+                    grayim_2)
+
+                matcher = cv2.DescriptorMatcher_create(
+                    cv2.DescriptorMatcher_FLANNBASED)
+                knn_matches = matcher.knnMatch(descriptors_1, descriptors_2, 2)
+                # -- Filter matches using the Lowe's ratio test
+                ratio_thresh = 0.7
+                good_matches = []
+                for m, n in knn_matches:
+                    if m.distance < ratio_thresh * n.distance:
+                        good_matches.append(m)
+
+                bad_essential_matrix, new_good_matches = self.ransac_filter_flann(
+                    good_matches, keypoints_1, keypoints_2, threshold, calibration)
+                if bad_essential_matrix:
+                    print(
+                        "Not enough points to generate essential matrix for image_", i, " and image_", j)
+                    continue
+                print("Matches between image {} and image {} (ransac filter/two way NN matches): ".format(i, j),
+                      new_good_matches.shape[0], "/", len(knn_matches))
+                self.save_feature_matches(
+                    i, j, new_good_matches)
+                self.save_match_images(
+                    i, j, new_good_matches, keypoints_1, keypoints_2)
+
+    def ransac_filter_flann(self, matches, keypoints_1, keypoints_2, threshold, calibration):
+        """Use opencv ransac to filter matches."""
+        src = np.array([], dtype=np.float).reshape(0, 2)
+        dst = np.array([], dtype=np.float).reshape(0, 2)
+        for match in matches:
+            src = np.vstack((src, keypoints_1[int(match.queryIdx)]))
+            dst = np.vstack((dst, keypoints_2[int(match.trainIdx)]))
+
+        if src.shape[0] < 20:
+            return True, np.array([])
+
+        src = np.expand_dims(src, axis=1)
+        dst = np.expand_dims(dst, axis=1)
+        E, mask = cv2.findEssentialMat(
+            dst, src, cameraMatrix=calibration.matrix(), method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        # print("E:\n", E)
+        # R1, R2, T = cv2.decomposeEssentialMat(E)
+        # print("R1:\n", R1)
+        # print("R2:\n", R2)
+        # print("T:\n", T)
+        # fundamental_mat, mask = cv2.findFundamentalMat(
+        #     src, dst, cv2.FM_RANSAC, 1, 0.99)
+        # print("fundamental_mat:\n", fundamental_mat)
+
+        if mask is None:
+            return True, np.array([])
+        good_matches = np.array([[matches[i].queryIdx, matches[i].trainIdx]
+                                 for i, score in enumerate(mask) if score == 1])
+
+        return False, good_matches
+
     def ransac_filter_opencv(self, matches, keypoints_1, keypoints_2, threshold, calibration):
         """Use opencv ransac to filter matches."""
         src = np.array([], dtype=np.float).reshape(0, 2)
@@ -209,15 +279,16 @@ class SuperpointWrapper(object):
 
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
-        E, mask = cv2.findEssentialMat(
-            dst, src, cameraMatrix=calibration, method=cv2.RANSAC, prob=0.999, threshold=threshold)
-        print("E:\n",E)
-        R1, R2, T = cv2.decomposeEssentialMat(E)
-        print("R1:\n",R1)
-        print("R2:\n",R2)
-        print("T:\n",T)
-        fundamental_mat, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 1, 0.99)
-        print("fundamental_mat:\n",fundamental_mat)
+        # E, mask = cv2.findEssentialMat(
+        #     dst, src, cameraMatrix=calibration.matrix(), method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        # print("E:\n", E)
+        # R1, R2, T = cv2.decomposeEssentialMat(E)
+        # print("R1:\n", R1)
+        # print("R2:\n", R2)
+        # print("T:\n", T)
+        fundamental_mat, mask = cv2.findFundamentalMat(
+            src, dst, cv2.FM_RANSAC, 1, 0.99)
+        print("fundamental_mat:\n", fundamental_mat)
 
         if mask is None:
             return True, np.array([])
@@ -247,9 +318,9 @@ class SuperpointWrapper(object):
             f.write("/* Format: \n frame_1_idx frame_2_idx \n num_of_matches\n frame_1_idx feature_idx frame_2_idx feature_idx */\n" +
                     str(idx1)+' '+str(idx2)+'\n'+str(matches_number)+'\n'+content)
 
-    def save_match_images(self, idx1, idx2, matches, keypoints_1, keypoints_2):
+    def save_match_images(self, idx1, idx2, matches, keypoints_1, keypoints_2, save_dir='match_images/'):
         """Create an image to display matches between an image pair."""
-        dir_name = self.basedir+'match_images/'
+        dir_name = self.basedir+save_dir
         if not os.path.exists(dir_name):
             os.mkdir(dir_name)
         file_name = dir_name+'match_{}_{}.jpg'.format(idx1, idx2)
@@ -260,7 +331,7 @@ class SuperpointWrapper(object):
         for match in matches:
             pt_src = (int(keypoints_1[int(match[0])][0]), int(
                 keypoints_1[int(match[0])][1]))
-            pt_dst = (int(keypoints_2[int(match[1])][0]+640),
+            pt_dst = (int(keypoints_2[int(match[1])][0]+self.img_size[0]),
                       int(keypoints_2[int(match[1])][1]))
 
             cv2.circle(vis, pt_src, 3, (0, 255, 0), -1, lineType=16)
