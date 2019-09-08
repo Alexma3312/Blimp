@@ -66,7 +66,7 @@ class MappingBackEnd():
         """ Load features from .key files
         """
         feat_file = os.path.join(
-            self._basedir, "{0:07}.key".format(image_index))
+            self._basedir+'features/', "{0:07}.key".format(image_index))
         keypoints, descriptors = load_features(feat_file)
         return keypoints, descriptors
 
@@ -75,7 +75,7 @@ class MappingBackEnd():
             matches - a list of [image 1 index, image 1 keypoint index, image 2 index, image 2 keypoint index]
         """
         matches_file = os.path.join(
-            self._basedir, "match_{0}_{1}.dat".format(frame_1, frame_2))
+            self._basedir+'matches/', "match_{0}_{1}.dat".format(frame_1, frame_2))
         if os.path.isfile(matches_file) is False:
             return []
         _, matches = get_matches(matches_file)
