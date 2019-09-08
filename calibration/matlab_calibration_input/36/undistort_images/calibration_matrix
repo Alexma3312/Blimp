@@ -1,0 +1,4 @@
+distort_calibration_matrix = Cal3_S2(
+    fx=347.820593, fy=329.096945, s=0, u0=295.717950, v0=222.964889).matrix()
+distortion_coefficients = np.array(
+    [-0.284322, 0.055723, 0.006772, 0.005264, 0.000000])
