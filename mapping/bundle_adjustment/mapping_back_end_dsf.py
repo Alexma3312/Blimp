@@ -222,11 +222,28 @@ class MappingBackEnd():
 
         # Initial estimate for landmarks
         for landmark_idx, observation_list in enumerate(self._landmark_map):
-            key_point = observation_list[0][1]
-            pose_idx = observation_list[0][0]
-            pose = self._pose_estimates[pose_idx]
-            landmark_3d_point = self.back_projection(
-                key_point, pose, self._depth)
+            landmark_3d_point = Point3()
+            for observation in observation_list:
+                key_point = observation_list[0][1]
+                pose_idx = observation_list[0][0]
+                pose = self._pose_estimates[pose_idx]
+                estimate_landmark = self.back_projection(
+                    key_point, pose, self._depth)
+                _x = estimate_landmark.x()+landmark_3d_point.x()
+                _y = estimate_landmark.y()+landmark_3d_point.y()
+                _z = estimate_landmark.z()+landmark_3d_point.z()
+                landmark_3d_point = Point3(_x, _y, _z)
+            # key_point = observation_list[0][1]
+            # pose_idx = observation_list[0][0]
+            # pose = self._pose_estimates[pose_idx]
+            # landmark_3d_point = self.back_projection(
+            #     key_point, pose, self._depth)
+            observation_number = len(observation_list)
+            _x = landmark_3d_point.x()/observation_number
+            _y = landmark_3d_point.y()/observation_number
+            _z = landmark_3d_point.z()/observation_number
+            landmark_3d_point = Point3(_x, _y, _x)
+
             # To test indeterminate system
             # if(landmark_idx == 477 or landmark_idx == 197 or landmark_idx == 204 or landmark_idx == 458 or landmark_idx == 627 or landmark_idx == 198):
             #     continue
