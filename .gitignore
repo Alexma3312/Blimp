@@ -1,5 +1,6 @@
 *.jpg
 *.csv
+!calibration/*
 # *.pyc
 # *.bin
 # *.ipch
