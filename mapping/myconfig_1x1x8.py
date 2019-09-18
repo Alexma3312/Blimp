@@ -5,14 +5,14 @@ import numpy as np
 from gtsam import Cal3_S2 # pylint: disable=no-name-in-module
 import cv2
 
-# Steps, True or False
+# Steps
 run_undistortion = False
 run_feature_extraction = False
 run_feature_matching = False
 run_bundle_adjustment = True
 save_result = True
 
-basedir = "mapping/datasets/flann_klaus_4x3x8/"
+basedir = "mapping/datasets/flann_klaus_1x1x8/"
 image_extension = ".jpg"
 source_image_size = (640, 480)
 
@@ -31,7 +31,7 @@ calibration_matrix = Cal3_S2(fx=211.8927, fy=197.7030, s=0,
 u0=281.1168, v0=179.2954)
 undistort_img_size = (583, 377)
 
-number_images = 98
+number_images = 10
 
 # Feature Type can be:
 #   - 'Superpoint'
@@ -55,11 +55,11 @@ method = cv2.RANSAC
 
 # Create pose estimates
 theta = 45
-delta_x = [0,3.7592,5]
+delta_x = [0,3.7592]
 delta_y = [0,1.75895,1.75895*2,1.75895*3]
 delta_z = 0.9652
-rows = 4
-cols = 3
+rows = 1
+cols = 1
 angles = 8
 
 prior1_delta = [0, 0, delta_z, 0]
@@ -67,8 +67,7 @@ prior2_delta = [3.7592, 1.75895, delta_z, 0]
 
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True
-min_obersvation_number = 6
-# There is result when backprojection_depth is 10. But the result is wrong.
+min_obersvation_number =3
 backprojection_depth = 10
 
 

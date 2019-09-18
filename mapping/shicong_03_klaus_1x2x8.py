@@ -10,7 +10,7 @@ import gtsam
 from gtsam import Cal3_S2  # pylint: disable=ungrouped-imports
 from mapping.bundle_adjustment.mapping_back_end_dsf import MappingBackEnd
 from mapping.feature_matcher.feature_matcher import FeatureMatcher
-from mapping.myconfig_4x3x8 import *
+from mapping.myconfig_1x2x8 import *
 from utilities.plotting import plot_with_result
 from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
 
@@ -42,7 +42,7 @@ def run():
         sigma = 1.0
         # measurement_noise = gtsam.noiseModel_Isotropic.Sigma(2, sigma)
         measurement_noise = gtsam.noiseModel_Robust(gtsam.noiseModel_mEstimator_Huber(1.345), gtsam.noiseModel_Isotropic.Sigma(2, sigma))
-        
+
         # Create pose prior noise
         rotation_sigma = np.radians(60)
         translation_sigma = 1
@@ -57,7 +57,6 @@ def run():
         sfm_result = back_end.bundle_adjustment()
         toc_ba = time.time()
         print('BA spents ', toc_ba-tic_ba, 's')
-        # print(sfm_result)
         # Plot Result
         plot_with_result(sfm_result, 30, 30, 30, 0.5)
 

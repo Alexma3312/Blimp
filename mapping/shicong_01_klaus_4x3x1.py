@@ -40,7 +40,9 @@ def run():
 
         # Create measurement noise for bundle adjustment
         sigma = 1.0
-        measurement_noise = gtsam.noiseModel_Isotropic.Sigma(2, sigma)
+        # measurement_noise = gtsam.noiseModel_Isotropic.Sigma(2, sigma)
+        measurement_noise = gtsam.noiseModel_Robust(gtsam.noiseModel_mEstimator_Huber(1.345), gtsam.noiseModel_Isotropic.Sigma(2, sigma))
+
         # Create pose prior noise
         rotation_sigma = np.radians(60)
         translation_sigma = 1

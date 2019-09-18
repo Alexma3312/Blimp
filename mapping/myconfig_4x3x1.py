@@ -68,8 +68,6 @@ prior2_delta = [3.7592, 1.75895, delta_z, 0]
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True
 min_obersvation_number = 6
-prob = 0.9
-threshold = 3
 backprojection_depth = 15
 
 
