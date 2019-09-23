@@ -194,6 +194,85 @@ class TrajectoryEstimator():
 
         return observations
 
+    def new_landmark_association(self, superpoint_features, observed_landmarks):
+        """ Associate Superpoint feature points with landmark points by matching all superpoint features with projected features.
+        Parameters:
+            superpoint_features - A Features Object
+            observed_landmarks - A Landmarks Object
+        Returns:
+            observations - [(Point2(), Point3())]
+
+        """
+        if superpoint_features.get_length() == 0 or observed_landmarks.get_length() == 0:
+            print("Input data is empty.")
+            return [[]]
+        if self.l2_threshold < 0.0:
+            raise ValueError('\'nn_thresh\' should be non-negative')
+
+        observations = []
+        src = np.array([], dtype=np.float).reshape(0, 2)
+        dst = np.array([], dtype=np.float).reshape(0, 2)
+        for i, projected_point in enumerate(observed_landmarks.keypoints):
+            nearby_feature_indices = []
+            min_score = self.l2_threshold
+            # Calculate the pixels distances between current superpoint and all the points in the map
+            for j, superpoint in enumerate(superpoint_features.keypoints):
+                x_diff = abs(superpoint[0] - projected_point[0])
+                y_diff = abs(superpoint[1] - projected_point[1])
+                if(x_diff < self.x_distance_thresh and y_diff < self.y_distance_thresh):
+                    # if((x_diff*x_diff+y_diff*y_diff)**0.5 < 2):
+                    nearby_feature_indices.append(j)
+            # print("nearby_feature_indices", nearby_feature_indices)
+            if nearby_feature_indices == []:
+                continue
+
+            for feature_index in nearby_feature_indices:
+                # Compute L2 distance. Easy since vectors are unit normalized.
+                dmat = np.dot(
+                    np.array(superpoint_features.descriptors[feature_index]), np.array(observed_landmarks.descriptors[i]).T)
+                dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
+                # Select the minimal L2 distance point
+                if dmat < min_score:
+                    min_score = dmat
+                    key_point = superpoint_features.keypoints[feature_index]
+                    landmark = observed_landmarks.landmarks[i]
+
+                    observations.append(
+                        (Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])))
+
+                    src = np.vstack((src, int(round(key_point[0])), int(round(key_point[1]))))
+                    dst = np.vstack((dst, [observed_landmarks.keypoints[i].x(), observed_landmarks.keypoints[i].y()]))
+
+        bad_essential_matrix, filtered_observations = self.ransac_filter(observations, src, dst)
+
+        if bad_essential_matrix:
+            print("Not enough points to generate essential matrix.")
+            return []
+            
+        return observations
+
+    def ransac_filter(self,observations, src, dst, threshold = 1):
+        """Use opencv ransac to filter matches."""
+        src = np.array([], dtype=np.float).reshape(0, 2)
+        dst = np.array([], dtype=np.float).reshape(0, 2)
+
+        # if src.shape[0] < 20:
+        #     return True, np.array([])
+
+        src = np.expand_dims(src, axis=1)
+        dst = np.expand_dims(dst, axis=1)
+        E, mask = cv2.findEssentialMat(
+            dst, src, cameraMatrix=self.calibration.matrix(), method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        # fundamental_mat, mask = cv2.findFundamentalMat(
+        #     src, dst, cv2.FM_RANSAC, 1, 0.99)
+        # print("fundamental_mat:\n", fundamental_mat)
+
+        if mask is None:
+            return True, np.array([])
+        filtered_observations = [observations[i] for i, score in enumerate(mask) if score == 1]
+
+        return False, filtered_observations
+
     def pose_estimate(self, observations, estimated_pose):
         """ Estimate current pose with matched features through GTSAM and update the trajectory
         Parameters:
