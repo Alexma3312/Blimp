@@ -37,7 +37,7 @@ class MappingBackEnd():
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20, ransac_enable=True):
         """Construct by reading from a data directory."""
         # Parameters for CV2 find Essential matrix
         self._cv_prob = prob
@@ -58,7 +58,7 @@ class MappingBackEnd():
             image_index)[0] for image_index in range(self._nrimages)]
         self._image_descriptors = [self.load_features(
             image_index)[1] for image_index in range(self._nrimages)]
-        landmark_map, dsf = self.create_landmark_map()
+        landmark_map, dsf = self.create_landmark_map(ransac_enable)
         self._landmark_map = self.filter_bad_landmarks(
             landmark_map, dsf, filter_bad_landmarks_enable)
 
@@ -210,7 +210,7 @@ class MappingBackEnd():
         # Transfer normalized key_point into homogeneous coordinate and scale with depth
         ph = Point3(depth*pn.x(), depth*pn.y(), depth)
         # Transfer the point into the world coordinate
-        return pose.transform_from(ph)
+        return pose.transformFrom(ph)
 
     def create_initial_estimate(self):
         """Create initial estimate with landmark map.
@@ -219,34 +219,13 @@ class MappingBackEnd():
                 landmark_map - list, A map of landmarks and their correspondence
         """
         initial_estimate = gtsam.Values()
-
         # Initial estimate for landmarks
         for landmark_idx, observation_list in enumerate(self._landmark_map):
-            landmark_3d_point = Point3()
-            for observation in observation_list:
-                key_point = observation_list[0][1]
-                pose_idx = observation_list[0][0]
-                pose = self._pose_estimates[pose_idx]
-                estimate_landmark = self.back_projection(
-                    key_point, pose, self._depth)
-                _x = estimate_landmark.x()+landmark_3d_point.x()
-                _y = estimate_landmark.y()+landmark_3d_point.y()
-                _z = estimate_landmark.z()+landmark_3d_point.z()
-                landmark_3d_point = Point3(_x, _y, _z)
-            # key_point = observation_list[0][1]
-            # pose_idx = observation_list[0][0]
-            # pose = self._pose_estimates[pose_idx]
-            # landmark_3d_point = self.back_projection(
-            #     key_point, pose, self._depth)
-            observation_number = len(observation_list)
-            _x = landmark_3d_point.x()/observation_number
-            _y = landmark_3d_point.y()/observation_number
-            _z = landmark_3d_point.z()/observation_number
-            landmark_3d_point = Point3(_x, _y, _x)
-
-            # To test indeterminate system
-            # if(landmark_idx == 477 or landmark_idx == 197 or landmark_idx == 204 or landmark_idx == 458 or landmark_idx == 627 or landmark_idx == 198):
-            #     continue
+            key_point = observation_list[0][1]
+            pose_idx = observation_list[0][0]
+            pose = self._pose_estimates[pose_idx]
+            landmark_3d_point = self.back_projection(
+                key_point, pose, self._depth)
             initial_estimate.insert(P(landmark_idx), landmark_3d_point)
         # Filter valid poses
         valid_pose_indices = set()
@@ -258,7 +237,6 @@ class MappingBackEnd():
         for pose_idx in valid_pose_indices:
             initial_estimate.insert(
                 X(pose_idx), self._pose_estimates[pose_idx])
-
         return initial_estimate
 
     def bundle_adjustment(self):
@@ -282,9 +260,6 @@ class MappingBackEnd():
             for obersvation in observation_list:
                 pose_idx = obersvation[0]
                 key_point = obersvation[1]
-                # To test indeterminate system
-                # if(landmark_idx == 477 or landmark_idx == 197 or landmark_idx == 204 or landmark_idx == 458 or landmark_idx == 627 or landmark_idx == 198):
-                #     continue
                 graph.add(gtsam.GenericProjectionFactorCal3_S2(
                     key_point, self._measurement_noise,
                     X(pose_idx), P(landmark_idx), self._calibration))
