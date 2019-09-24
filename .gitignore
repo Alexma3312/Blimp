@@ -1,5 +1,6 @@
 *.jpg
 *.csv
+
 # *.pyc
 # *.bin
 # *.ipch
@@ -7,4 +8,8 @@ __pycache__/
 .vscode/
 *.dat
 *.key
-datasets/scripts/*.py
+*.pyc
+mapping/datasets/*
+mapping/feature_matcher/myconfig.py
+collect_data/wall_corresponding_feature_data
+!calibration/perpendicularity_verification/perpendicular_walls_manual_data/**/*.jpg

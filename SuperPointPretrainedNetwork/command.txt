@@ -1,1 +1,0 @@
-python3 ./demo_superpoint.py dataset/ --img_glob=*.jpg --write

@@ -36,10 +36,15 @@ This project is a front end vision and control system than can be deployed on a 
 
 ## Software
 
-- This project is developed in Ubuntu 16.04 LST with python3
-- The project relies on `Superpoint` and `GTSAM`
-- `Superpoint` requires `opencv` and `torch`
-- `GTSAM` requires `boost` and `cmake`
+### Dependencies
+
+* [GTSAM](https://gtsam.org/) 4.0
+* [Superpoint](https://github.com/MagicLeapResearch/SuperPointPretrainedNetwork)
+  - Superpoint is Downloaded as a Submodule in the repo. Thus you only need to install Superpoint dependencies to run Superpoint.
+  - [OpenCV](https://opencv.org/) python >= 3.4
+  - [PyTorch](https://pytorch.org/) >= 0.4
+* Numpy - standard pythonic module 
+
 
 ### Offline Mapping
 
@@ -68,42 +73,6 @@ Then, we match newly extracted feature point with points in the map by comparing
 Through the data association process above, we can find the match of feature points with landmarks in the map. We use these matches as factors and add to a new factor graph.
 
 For each landmark in the factor graph, we will add a strongly constraint prior factor.
-
-
-
-### Superpoint
-https://github.com/MagicLeapResearch/SuperPointPretrainedNetwork
-
-### GTSAM
-https://bitbucket.org/gtborg/gtsam/src/develop/
-
-
-### Install and build GTSAM with python3
-
-In the root library folder execute:
-```
-$ git clone https://bitbucket.org/matt_broadway/gtsam.git
-$ cd gtsam
-$ git checkout python3_and_setuppy
-$ mkdir build
-$ cd build
-$ cmake \
-    -DPython_ADDITIONAL_VERSIONS=3 \
-    -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_INSTALL_PREFIX=./install \
-    -DGTSAM_INSTALL_CYTHON_TOOLBOX=ON \
-    -DGTSAM_INSTALL_CYTHON_TOOLBOX=ON \
-    -DGTSAM_ALLOW_DEPRECATED_SINCE_V4=OFF \
-    -DGTSAM_BUILD_PYTHON=OFF \
-    ..
-$ NUMCPUS=`grep -c '^processor' /proc/cpuinfo`
-$ make -j$NUMCPUS
-$ make -j$NUMCPUS check
-$ make -j$NUMCPUS install
-$ cd install/cython
-$ python3 setup.py install  # if running in a virtual environment
-$ sudo python3 setup.py install  # to install system-wide
-```
 
 ## Coding Dogma
 1. Unittest: https://docs.python.org/3/library/unittest.html
