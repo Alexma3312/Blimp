@@ -38,8 +38,11 @@ This project is a front end vision and control system than can be deployed on a 
 
 ### Dependencies
 
-* [Superpoint](https://github.com/MagicLeapResearch/SuperPointPretrainedNetwork)
 * [GTSAM](https://gtsam.org/) 4.0
+* [Superpoint](https://github.com/MagicLeapResearch/SuperPointPretrainedNetwork)
+  - Superpoint is Downloaded as a Submodule in the repo. Thus you only need to install Superpoint dependencies to run Superpoint.
+  - [OpenCV](https://opencv.org/) python >= 3.4
+  - [PyTorch](https://pytorch.org/) >= 0.4
 * Numpy - standard pythonic module 
 
 
