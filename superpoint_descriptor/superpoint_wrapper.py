@@ -222,9 +222,9 @@ class SuperpointWrapper(object):
                     if m.distance < ratio_thresh * n.distance:
                         good_matches.append(m)
 
-                bad_essential_matrix, new_good_matches = self.ransac_filter_flann(
+                flag, new_good_matches, essential_matrix = self.ransac_filter_flann(
                     good_matches, keypoints_1, keypoints_2, threshold, calibration)
-                if bad_essential_matrix:
+                if flag:
                     print(
                         "Not enough points to generate essential matrix for image_", i, " and image_", j)
                     continue
@@ -250,11 +250,11 @@ class SuperpointWrapper(object):
         dst = np.expand_dims(dst, axis=1)
         E, mask = cv2.findEssentialMat(
             dst, src, cameraMatrix=calibration.matrix(), method=cv2.RANSAC, prob=0.999, threshold=threshold)
-        # print("E:\n", E)
-        # R1, R2, T = cv2.decomposeEssentialMat(E)
-        # print("R1:\n", R1)
-        # print("R2:\n", R2)
-        # print("T:\n", T)
+        print("E:\n", E)
+        R1, R2, T = cv2.decomposeEssentialMat(E)
+        print("R1:\n", R1)
+        print("R2:\n", R2)
+        print("T:\n", T)
         # fundamental_mat, mask = cv2.findFundamentalMat(
         #     src, dst, cv2.FM_RANSAC, 1, 0.99)
         # print("fundamental_mat:\n", fundamental_mat)
@@ -264,7 +264,7 @@ class SuperpointWrapper(object):
         good_matches = np.array([[matches[i].queryIdx, matches[i].trainIdx]
                                  for i, score in enumerate(mask) if score == 1])
 
-        return False, good_matches
+        return False, good_matches, E
 
     def ransac_filter_opencv(self, matches, keypoints_1, keypoints_2, threshold, calibration):
         """Use opencv ransac to filter matches."""
@@ -297,6 +297,9 @@ class SuperpointWrapper(object):
         good_matches = np.array(good_matches)[:, :2]
 
         return False, good_matches
+
+    def save_essential_matrix(self, idx1, idx2, matches, save_dir='matches/' ):
+        pass
 
     def save_feature_matches(self, idx1, idx2, matches, save_dir='matches/'):
         """Save the feature matches of index 1 image and index 2 image."""
