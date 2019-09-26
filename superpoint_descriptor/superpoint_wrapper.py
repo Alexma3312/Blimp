@@ -234,6 +234,16 @@ class SuperpointWrapper(object):
                     i, j, new_good_matches)
                 self.save_match_images(
                     i, j, new_good_matches, keypoints_1, keypoints_2)
+                
+                # Save essential matrix
+                # Create a file called essential_matrices.dat
+                dir_name = self.basedir+'matches/'
+                file_name = dir_name+'essential_matrices.dat'
+                f = open(file_name,'w')
+                f.write("/* Format: \n frame_1_idx frame_2_idx essential matrix */\n")
+                # Write essential matrices into the file
+                self.save_essential_matrix(i, j,essential_matrix, file_name)
+
 
     def ransac_filter_flann(self, matches, keypoints_1, keypoints_2, threshold, calibration):
         """Use opencv ransac to filter matches."""
@@ -298,8 +308,13 @@ class SuperpointWrapper(object):
 
         return False, good_matches
 
-    def save_essential_matrix(self, idx1, idx2, matches, save_dir='matches/' ):
-        pass
+    def save_essential_matrix(self, idx1, idx2, essential_matrix, file_name):
+        """Save the essential matrices into a file."""
+        # https://www.w3schools.com/python/python_file_write.asp
+        f = open(file_name, "a")
+        f.write("{} {} {}\n".format(idx1,idx2,essential_matrix))
+        f.close()
+
 
     def save_feature_matches(self, idx1, idx2, matches, save_dir='matches/'):
         """Save the feature matches of index 1 image and index 2 image."""
