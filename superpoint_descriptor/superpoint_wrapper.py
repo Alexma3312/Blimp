@@ -234,16 +234,9 @@ class SuperpointWrapper(object):
                     i, j, new_good_matches)
                 self.save_match_images(
                     i, j, new_good_matches, keypoints_1, keypoints_2)
-                
-                # Save essential matrix
-                # Create a file called essential_matrices.dat
-                dir_name = self.basedir+'matches/'
-                file_name = dir_name+'essential_matrices.dat'
-                f = open(file_name,'w')
-                f.write("/* Format: \n frame_1_idx frame_2_idx essential matrix */\n")
-                # Write essential matrices into the file
-                self.save_essential_matrix(i, j,essential_matrix, file_name)
 
+                # Save essential matrix
+                self.save_essential_matrix(i, j, essential_matrix)
 
     def ransac_filter_flann(self, matches, keypoints_1, keypoints_2, threshold, calibration):
         """Use opencv ransac to filter matches."""
@@ -254,23 +247,23 @@ class SuperpointWrapper(object):
             dst = np.vstack((dst, keypoints_2[int(match.trainIdx)]))
 
         if src.shape[0] < 20:
-            return True, np.array([])
+            return True, np.array([]), np.array([])
 
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
         E, mask = cv2.findEssentialMat(
             dst, src, cameraMatrix=calibration.matrix(), method=cv2.RANSAC, prob=0.999, threshold=threshold)
-        print("E:\n", E)
-        R1, R2, T = cv2.decomposeEssentialMat(E)
-        print("R1:\n", R1)
-        print("R2:\n", R2)
-        print("T:\n", T)
+        # print("E:\n", E)
+        # R1, R2, T = cv2.decomposeEssentialMat(E)
+        # print("R1:\n", R1)
+        # print("R2:\n", R2)
+        # print("T:\n", T)
         # fundamental_mat, mask = cv2.findFundamentalMat(
         #     src, dst, cv2.FM_RANSAC, 1, 0.99)
         # print("fundamental_mat:\n", fundamental_mat)
 
         if mask is None:
-            return True, np.array([])
+            return True, np.array([]), np.array([])
         good_matches = np.array([[matches[i].queryIdx, matches[i].trainIdx]
                                  for i, score in enumerate(mask) if score == 1])
 
@@ -308,13 +301,23 @@ class SuperpointWrapper(object):
 
         return False, good_matches
 
-    def save_essential_matrix(self, idx1, idx2, essential_matrix, file_name):
+    def save_essential_matrix(self, idx1, idx2, essential_matrix):
         """Save the essential matrices into a file."""
-        # https://www.w3schools.com/python/python_file_write.asp
-        f = open(file_name, "a")
-        f.write("{} {} {}\n".format(idx1,idx2,essential_matrix))
-        f.close()
-
+        # Create a file called essential_matrices.dat
+        dir_name = self.basedir+'matches/'
+        file_name = dir_name+'essential_matrices.dat'
+        if idx1 == 0 and idx2 == 1:
+            f = open(file_name, 'w')
+            f.write("/* Format: \n frame_1_idx frame_2_idx essential matrix */\n")
+            f.close
+        if os.path.exists(file_name):
+            f = open(file_name, "a")
+            f.write("{} {} ".format(idx1, idx2))
+            for i in range(3):
+                for j in range(3):
+                    f.write("{} ".format(essential_matrix[i,j]))
+            f.write("\n")
+            f.close()
 
     def save_feature_matches(self, idx1, idx2, matches, save_dir='matches/'):
         """Save the feature matches of index 1 image and index 2 image."""
