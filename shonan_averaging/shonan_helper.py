@@ -52,12 +52,13 @@ def generate_g20_data_file(pose_estimates, factors):
     for i,pose in enumerate(pose_estimates):
         f.write("VERTEX_SE3:QUAT {}".format(i))
         translation = pose.translation().vector()
-        rotation = pose.rotation().matrix()
+        rotation = pose.rotation().quaternion()
+        # Switch from w,x,y,z to x,y,z,w
+        rotation = np.array([rotation[1],rotation[2],rotation[3],rotation[0]])
         for t in translation:
             f.write(" {}".format(t))
-        for m in range(3):
-            for n in range(3):
-                f.write(" {}".format(rotation[m,n]))
+        for q in rotation:
+            f.write(" {}".format(q))
         f.write("\n")
     for factor in factors.keys():
         f.write("EDGE_SE3:QUAT {} {}".format(factor[0],factor[1]))
@@ -161,7 +162,10 @@ def decompose_essential(depth, pose_estimates):
             rot = R1
         else:
             rot = R2
-        edge = np.append(pose_estimates[idx2].translation().vector()-pose_estimates[idx1].translation().vector(),rot.reshape(1,9))
+        quat = Rot3(rot).quaternion()
+        # Switch from w,x,y,z to x,y,z,w
+        quat = np.array([quat[1],quat[2],quat[3],quat[0]])
+        edge = np.append(pose_estimates[idx2].translation().vector()-pose_estimates[idx1].translation().vector(),quat)
         edge = np.append(edge,np.array([100,0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 100, 0, 0, 0, 100, 0, 0, 100, 0, 100]))
         edges[(idx1, idx2)] = edge
         
