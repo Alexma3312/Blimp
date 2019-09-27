@@ -7,7 +7,7 @@ import numpy as np
 
 from mapping.bundle_adjustment.parser import get_matches
 from mapping.bundle_adjustment.parser import load_features as get_features
-from shonan_averaging.myconfig import *
+from shonan_averaging.myconfig_perpend import *
 from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
 import cv2
 from gtsam import Point3, Pose3, Point2, Rot3
@@ -45,8 +45,27 @@ def back_projection(key_point=Point2(), pose=Pose3(), depth=20):
     return pose.transformFrom(ph)
 
 
-def generate_g20_data_file():
-    pass
+def generate_g20_data_file(pose_estimates, factors):
+    dir_name = basedir+'matches/'
+    file_name = dir_name+'shicong.g2o'
+    f = open(file_name, 'w')
+    for i,pose in enumerate(pose_estimates):
+        f.write("VERTEX_SE3:QUAT {}".format(i))
+        translation = pose.translation().vector()
+        rotation = pose.rotation().matrix()
+        for t in translation:
+            f.write(" {}".format(t))
+        for m in range(3):
+            for n in range(3):
+                f.write(" {}".format(rotation[m,n]))
+        f.write("\n")
+    for factor in factors.keys():
+        f.write("EDGE_SE3:QUAT {} {}".format(factor[0],factor[1]))
+        for x in factors.get(factor):
+            f.write(" {}".format(x))
+        f.write("\n")
+    f.close
+    
 
 
 def load_features(image_index):
@@ -71,13 +90,15 @@ def load_matches(frame_1, frame_2):
     return matches
 
 
-def decompose_essential(depth):
+def decompose_essential(depth, pose_estimates):
     """Decompose essential matrices into rotation and transition."""
     # Create initial estimation.
-    pose_estimates = pose_estimate_generator_rectangle(
-        theta, delta_x, delta_y, delta_z, prior1_delta, prior2_delta, rows, cols, angles)
+    # pose_estimates = pose_estimate_generator_rectangle(
+    #     theta, delta_x, delta_y, delta_z, prior1_delta, prior2_delta, rows, cols, angles)
     # Get essential matrices
     essential_dict = read_essential_data()
+    # Create an edge dictiionary
+    edges = {}
     # Decompose essential matrices
     for value in essential_dict.keys():
         # Get image idices
@@ -113,11 +134,15 @@ def decompose_essential(depth):
                 r2_good_project_points += 1
         print(idx1, idx2, r1_good_project_points, r2_good_project_points)
 
+        # Get features
+        keypoints, _ = load_features(idx2)
         # Current Pose
         r_current_pose = Pose3(Rot3(), pose_estimates[idx2].translation())
         # Estimate Pose
-        l_estimate_pose_1 = Pose3(Rot3(np.linalg.inv(R1)), pose_estimates[idx2].translation())
-        l_estimate_pose_2 = Pose3(Rot3(np.linalg.inv(R2)), pose_estimates[idx2].translation())
+        l_estimate_pose_1 = Pose3(
+            Rot3(np.linalg.inv(R1)), pose_estimates[idx1].translation())
+        l_estimate_pose_2 = Pose3(
+            Rot3(np.linalg.inv(R2)), pose_estimates[idx1].translation())
         for match in matches:
             # back projection
             point_3d = back_projection(
@@ -132,10 +157,14 @@ def decompose_essential(depth):
             if result2 is True:
                 r2_good_project_points += 1
         print(idx1, idx2, r1_good_project_points, r2_good_project_points)
-        if(r1_good_project_points>=r2_good_project_points):
+        if(r1_good_project_points >= r2_good_project_points):
             rot = R1
         else:
             rot = R2
+        edge = np.append(pose_estimates[idx2].translation().vector()-pose_estimates[idx1].translation().vector(),rot.reshape(1,9))
+        edge = np.append(edge,np.array([100,0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 100, 0, 0, 0, 100, 0, 0, 100, 0, 100]))
+        edges[(idx1, idx2)] = edge
+        
+    generate_g20_data_file(pose_estimates, edges)
 
 
-decompose_essential(15)

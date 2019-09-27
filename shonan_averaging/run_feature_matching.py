@@ -2,7 +2,7 @@
 """Undistort collected images."""
 # pylint: disable=no-name-in-module, wrong-import-order
 from mapping.feature_matcher.feature_matcher import FeatureMatcher
-from shonan_averaging.myconfig import (basedir, calibration_matrix,
+from shonan_averaging.myconfig_perpend import (basedir, calibration_matrix,
                                        feature_type, image_extension,
                                        matching_type, number_images,
                                        source_image_size, threshold,
