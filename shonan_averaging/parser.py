@@ -1,15 +1,14 @@
 """Parser."""
-import os
+
 
 import numpy as np
 
-from shonan_averaging.myconfig import (basedir, calibration_matrix,
-                                       number_images)
+from shonan_averaging.myconfig import *
+from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
 
 
 def read_essential_data():
-    """Read Data from file
-    """
+    """Read Essential Data from file."""
     dir_name = basedir+'matches/'
     file_name = dir_name+'essential_matrices.dat'
 
@@ -20,10 +19,22 @@ def read_essential_data():
     
     return essential_dict
 
+def generate_g20_data_file():
+    pass
 
 def decompose_essential():
-    read_essential_data()
+    """Decompose essential matrices into rotationa and transition."""
+
+    # Create initial estimation.
+    pose_estimates = pose_estimate_generator_rectangle(
+            theta, delta_x, delta_y, delta_z, prior1_delta, prior2_delta, rows, cols, angles)
+    # Get essential matrices
+    essential_dict = read_essential_data()
+    # Decompose essential matrices
+    for match in essential_dict:
+
+
     pass
 
 
-read_essential_data()
+decompose_essential()
