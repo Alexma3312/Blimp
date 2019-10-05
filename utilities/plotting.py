@@ -177,6 +177,25 @@ def plot_trajectory_verification(landmarks, poses, trajectory, x_axe=30, y_axe=3
     plt.legend()
     plt.show()
 
+def plot_poses(poses, x_axe=30, y_axe=30, z_axe=30, axis_length=2, figure_number=0):
+    """plot the result of sfm"""
+    # Declare an id for the figure
+    fig = plt.figure(figure_number)
+    axes = fig.gca(projection='3d')
+    plt.cla()
+    # Plot cameras
+    for pose in poses:
+        axis_length = axis_length
+        gtsam_plot.plot_pose3(figure_number, pose, axis_length)
+
+    # draw
+    axes.set_xlim3d(-x_axe, x_axe)
+    axes.set_ylim3d(-y_axe, y_axe)
+    axes.set_zlim3d(-z_axe, z_axe)
+    plt.legend()
+    plt.show()
+
+
 # >>>>>>>>>>>>>>>>>>Below is for color map>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # def plot_pose3_on_axes(axes, pose, axis_length=0.1):
 #     """Plot a 3D pose on given axis 'axes' with given 'axis_length'."""
