@@ -252,9 +252,11 @@ class SuperpointWrapper(object):
 
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
+        # https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
+        # https://stackoverflow.com/questions/32175286/strange-issue-with-stereo-triangulation-two-valid-solutions/36213818#36213818
         E, mask = cv2.findEssentialMat(
             dst, src, cameraMatrix=calibration.matrix(), method=cv2.RANSAC, prob=0.999, threshold=threshold)
-        _,R,t,mask_new = cv2.recoverPose(E,src,dst,calibration.matrix())
+        _,R,t,mask_new = cv2.recoverPose(E,dst,src,calibration.matrix())
 
         if mask is None:
             return True, np.array([]), np.array([]), np.array([])
