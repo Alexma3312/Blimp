@@ -9,13 +9,13 @@ import numpy as np
 
 import gtsam
 from gtsam import Point2, Point3, Pose3, Rot3
-from mapping.bundle_adjustment.parser import get_matches
-from mapping.bundle_adjustment.parser import load_features as get_features
-from shonan_averaging.myconfig_perpend import *
+# from mapping.bundle_adjustment.parser import get_matches
+# from mapping.bundle_adjustment.parser import load_features as get_features
+# from shonan_averaging.myconfig_perpend import *
 from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
 
 
-def read_rotation_data():
+def read_rotation_data(basedir):
     """Read Relative Rotation Data from file."""
     dir_name = basedir+'matches/'
     file_name = dir_name+'rotation.dat'
@@ -29,7 +29,7 @@ def read_rotation_data():
     return rotation_dict
 
 
-def generate_rotation_edge(rotation_dict):
+def generate_rotation_edge(rotation_dict, pose_estimates):
     """Generate Rotation Edge data."""
     # Create an edge dictiionary
     edges = {}
@@ -51,7 +51,7 @@ def generate_rotation_edge(rotation_dict):
     return edges
 
 
-def read_essential_data():
+def read_essential_data(basedir):
     """Read Essential Data from file."""
     dir_name = basedir+'matches/'
     file_name = dir_name+'essential_matrices.dat'
@@ -65,7 +65,7 @@ def read_essential_data():
     return essential_dict
 
 
-def generate_g20_data_file(pose_estimates, factors):
+def generate_g20_data_file(basedir, pose_estimates, factors):
     """Generate g2o data file with pose estimations and factors."""
     dir_name = basedir+'matches/'
     file_name = dir_name+'shicong.g2o'
@@ -90,7 +90,7 @@ def generate_g20_data_file(pose_estimates, factors):
     f.close
 
 
-def read_shonan_result(file_name):
+def read_shonan_result(basedir, file_name):
     file_path = basedir+file_name
     with open(file_path) as file:
         lines = file.readlines()[1:]
