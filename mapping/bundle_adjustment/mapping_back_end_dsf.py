@@ -221,11 +221,19 @@ class MappingBackEnd():
         initial_estimate = gtsam.Values()
         # Initial estimate for landmarks
         for landmark_idx, observation_list in enumerate(self._landmark_map):
-            key_point = observation_list[0][1]
-            pose_idx = observation_list[0][0]
-            pose = self._pose_estimates[pose_idx]
-            landmark_3d_point = self.back_projection(
-                key_point, pose, self._depth)
+            # Average initial estimates
+            landmark_3d_point = np.zeros((3, 1))
+            for observation in observation_list:
+                key_point = observation_list[0][1]
+                pose_idx = observation_list[0][0]
+                pose = self._pose_estimates[pose_idx]
+                estimate_landmark = self.back_projection(
+                    key_point, pose, self._depth)
+                _x = estimate_landmark.x()+landmark_3d_point[0]
+                _y = estimate_landmark.y()+landmark_3d_point[1]
+                _z = estimate_landmark.z()+landmark_3d_point[2]
+            landmark_3d_point = landmark_3d_point/len(observation_list)
+            landmark_3d_point = Point3(landmark_3d_point[0,0], landmark_3d_point[1,0], landmark_3d_point[2,0])
             initial_estimate.insert(P(landmark_idx), landmark_3d_point)
         # Filter valid poses
         valid_pose_indices = set()
