@@ -5,6 +5,7 @@ from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
 from gtsam import Cal3_S2, Pose3, Point3, Rot3 # pylint: disable=no-name-in-module
 import cv2
 from shonan_averaging.shonan_helper import read_shonan_result
+from utilities.plotting import plot_poses
 
 # Steps
 run_undistortion = False
@@ -63,6 +64,7 @@ shonan_result = read_shonan_result(basedir,'shonan_result.dat')
 shonan_result_normalize = [np.dot(shonan_result[i].matrix(),shonan_result[0].matrix().transpose()) for i in range(number_images)]
 pose_estimates = [Pose3(Rot3(np.dot(shonan_result_normalize[i],wRc.matrix())), Point3(0.5*i, 0, 1.5))
                       for i in range(number_images)]
+plot_poses(pose_estimates, 5,5,5,1)
 
 # pose_estimates = [Pose3(shonan_result[i], Point3(0.5*i, 0, 1.5))
 #                       for i in range(number_images)]

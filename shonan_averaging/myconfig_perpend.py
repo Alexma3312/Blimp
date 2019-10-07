@@ -4,7 +4,7 @@ import numpy as np
 from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
 from gtsam import Cal3_S2, Pose3, Point3, Rot3 # pylint: disable=no-name-in-module
 import cv2
-
+from utilities.plotting import plot_poses
 # Steps
 run_undistortion = False
 run_feature_extraction = False
@@ -60,7 +60,7 @@ method = cv2.RANSAC
 wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # pylint: disable=invalid-name
 pose_estimates = pose_estimates = [Pose3(wRc, Point3(0.5*i, 0, 1.5))
                       for i in range(number_images)]
-
+plot_poses(pose_estimates,5,5,5,1)
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True
 min_obersvation_number = 3
