@@ -6,9 +6,9 @@ from gtsam import Cal3_S2, Pose3, Point3, Rot3 # pylint: disable=no-name-in-modu
 import cv2
 
 # Steps
-run_undistortion = False
-run_feature_extraction = False
-run_feature_matching = False
+run_undistortion = True
+run_feature_extraction = True
+run_feature_matching = True
 run_bundle_adjustment = True
 save_result = False
 
