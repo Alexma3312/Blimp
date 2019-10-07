@@ -88,11 +88,10 @@ pose_estimates = pose_estimate_generator_rectangle(
 plot_poses(pose_estimates,10,10,10,1)
 wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
 shonan_result = read_shonan_result(basedir, 'shonan_result_4x3x1.dat')
-shonan_result_normalize = [np.dot(shonan_result[i].matrix(
-), shonan_result[0].matrix().transpose()) for i in range(number_images)]
-pose_estimates = [Pose3(Rot3(np.dot(shonan_result_normalize[i], wRc.matrix())), pose_estimates[i].translation())
+shonan_result_normalize = [np.dot(shonan_result[0].matrix().transpose(), shonan_result[i].matrix()) for i in range(number_images)]
+pose_estimates = [Pose3(Rot3(np.dot(wRc.matrix(),shonan_result_normalize[i])), pose_estimates[i].translation())
                   for i in range(number_images)]
-# plot_poses(pose_estimates,10,10,10,1)
+plot_poses(pose_estimates,10,10,10,1)
 
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True

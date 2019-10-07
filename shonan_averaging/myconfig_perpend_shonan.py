@@ -61,15 +61,12 @@ method = cv2.RANSAC
 # Camera to world rotation
 wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
 shonan_result = read_shonan_result(basedir,'shonan_result.dat')
-shonan_result_normalize = [np.dot(shonan_result[i].matrix(),shonan_result[0].matrix().transpose()) for i in range(number_images)]
-pose_estimates = [Pose3(Rot3(np.dot(shonan_result_normalize[i],wRc.matrix())), Point3(0.5*i, 0, 1.5))
+# shonan_result_normalize = [np.dot(shonan_result[i].matrix(),shonan_result[0].matrix().transpose()) for i in range(number_images)]
+shonan_result_normalize = [np.dot(shonan_result[0].matrix().transpose(),shonan_result[i].matrix()) for i in range(number_images)]
+pose_estimates = [Pose3(Rot3(np.dot(wRc.matrix(),shonan_result_normalize[i])), Point3(0.5*i, 0, 1.5))
                       for i in range(number_images)]
 plot_poses(pose_estimates, 5,5,5,1)
 
-# pose_estimates = [Pose3(shonan_result[i], Point3(0.5*i, 0, 1.5))
-#                       for i in range(number_images)]
-# pose_estimates = [Pose3(Rot3(np.dot(shonan_result[i].matrix(),wRc.matrix())), Point3(0.5*i, 0, 1.5))
-#                       for i in range(number_images)]
 
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True
