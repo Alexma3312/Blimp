@@ -1,4 +1,4 @@
 """Configuration"""
-video_capture = 0
+video_capture = 1
 skip = 1
 save = 0
