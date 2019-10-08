@@ -4,7 +4,7 @@ import numpy as np
 
 from gtsam import Cal3_S2, Point3, Pose3, Rot3  # pylint: disable=no-name-in-module
 import cv2
-from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
+from utilities.pose_estimate_generator import pose_estimate_generator_half_circle
 from shonan_averaging.shonan_helper import read_shonan_result
 from utilities.plotting import plot_poses
 
@@ -13,9 +13,9 @@ run_undistortion = False
 run_feature_extraction = False
 run_feature_matching = False
 run_bundle_adjustment = True
-save_result = True
+save_result = False
 
-basedir = "shonan_averaging/datasets/flann_klaus_4x3x8/"
+basedir = "shonan_averaging/datasets/klaus_4x3x3/"
 image_extension = ".jpg"
 source_image_size = (640, 480)
 
@@ -34,7 +34,7 @@ calibration_matrix = Cal3_S2(fx=211.8927, fy=197.7030, s=0,
                              u0=281.1168, v0=179.2954)
 undistort_img_size = (583, 377)
 
-number_images = 98
+number_images = 38
 
 # Feature Type can be:
 #   - 'Superpoint'
@@ -63,29 +63,28 @@ delta_y = [0, 1.75895, 1.75895*2, 1.75895*3]
 delta_z = 0.9652
 rows = 4
 cols = 3
-angles = 8
+angles = 5
 
 prior1_delta = [0, 0, delta_z, 0]
 prior2_delta = [3.7592, 1.75895, delta_z, 0]
 
-pose_estimates = pose_estimate_generator_rectangle(
+pose_estimates = pose_estimate_generator_half_circle(
     theta, delta_x, delta_y, delta_z, prior1_delta, prior2_delta, rows, cols, angles)
-plot_poses(pose_estimates, 10, 10, 10, 1)
-wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
-shonan_result = read_shonan_result(basedir, 'shonan_result.dat')
-shonan_result_normalize = [np.dot(shonan_result[0].matrix().transpose(
-), shonan_result[i].matrix()) for i in range(number_images)]
-for rot in shonan_result_normalize:
-    print(np.dot(rot.transpose(), rot))
-pose_estimates = [Pose3(Rot3(np.dot(wRc.matrix(), shonan_result_normalize[i])), pose_estimates[i].translation())
-                  for i in range(3,number_images,8)]
-plot_poses(pose_estimates, 10, 10, 10, 1)
+# wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
+# shonan_result = read_shonan_result(basedir, 'shonan_result.dat')
+# shonan_result_normalize = [np.dot(shonan_result[0].matrix().transpose(
+# ), shonan_result[i].matrix()) for i in range(number_images)]
+# for rot in shonan_result_normalize:
+#     print(np.dot(rot.transpose(), rot))
+# pose_estimates = [Pose3(Rot3(np.dot(wRc.matrix(), shonan_result_normalize[i])), pose_estimates[i].translation())
+#                   for i in range(number_images)]
+# plot_poses(pose_estimates, 10, 10, 10, 1)
 
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True
 min_obersvation_number = 6
 # There is result when backprojection_depth is 10. But the result is wrong.
-backprojection_depth = 20
+backprojection_depth = 10
 
 
 # Image Name: "raw_frame_row_col_angle"
