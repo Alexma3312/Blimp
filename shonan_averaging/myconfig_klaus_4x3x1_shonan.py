@@ -89,6 +89,8 @@ plot_poses(pose_estimates,10,10,10,1)
 wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
 shonan_result = read_shonan_result(basedir, 'shonan_result_4x3x1.dat')
 shonan_result_normalize = [np.dot(shonan_result[0].matrix().transpose(), shonan_result[i].matrix()) for i in range(number_images)]
+for rot in shonan_result_normalize:
+    print(np.dot(rot.transpose(), rot))
 pose_estimates = [Pose3(Rot3(np.dot(wRc.matrix(),shonan_result_normalize[i])), pose_estimates[i].translation())
                   for i in range(number_images)]
 plot_poses(pose_estimates,10,10,10,1)

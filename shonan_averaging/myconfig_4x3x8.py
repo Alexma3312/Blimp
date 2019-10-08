@@ -78,7 +78,7 @@ shonan_result_normalize = [np.dot(shonan_result[0].matrix().transpose(
 for rot in shonan_result_normalize:
     print(np.dot(rot.transpose(), rot))
 pose_estimates = [Pose3(Rot3(np.dot(wRc.matrix(), shonan_result_normalize[i])), pose_estimates[i].translation())
-                  for i in range(3,number_images,8)]
+                  for i in range(number_images)]
 plot_poses(pose_estimates, 10, 10, 10, 1)
 
 # Bundle Adjustment parameters
