@@ -1,6 +1,6 @@
 """Execution File"""
 from shonan_averaging.shonan_helper import read_rotation_data, generate_rotation_edge, generate_g20_data_file
-from shonan_averaging.myconfig_4x3x3 import *
+from shonan_averaging.configs.myconfig_4x3x3 import *
 from utilities.pose_estimate_generator import pose_estimate_generator_quad
 from mapping.feature_matcher.feature_matcher import FeatureMatcher
 

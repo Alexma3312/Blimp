@@ -7,7 +7,7 @@ import time
 import numpy as np
 
 import gtsam
-from shonan_averaging.myconfig_perpend_shonan import *
+from shonan_averaging.configs.myconfig_perpend_shonan import *
 from gtsam import Cal3_S2  # pylint: disable=ungrouped-imports
 from mapping.bundle_adjustment.mapping_back_end_dsf import MappingBackEnd
 from mapping.feature_matcher.feature_matcher import FeatureMatcher

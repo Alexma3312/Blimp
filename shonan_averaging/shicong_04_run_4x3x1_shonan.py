@@ -10,7 +10,7 @@ import gtsam
 from gtsam import Cal3_S2  # pylint: disable=ungrouped-imports
 from mapping.bundle_adjustment.mapping_back_end_dsf import MappingBackEnd
 from mapping.feature_matcher.feature_matcher import FeatureMatcher
-from shonan_averaging.myconfig_klaus_4x3x1_shonan import *
+from shonan_averaging.configs.myconfig_klaus_4x3x1_shonan import *
 from utilities.plotting import plot_with_result
 
 def run():

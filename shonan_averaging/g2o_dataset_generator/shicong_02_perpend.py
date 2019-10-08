@@ -1,6 +1,6 @@
 """Execution File"""
 from shonan_averaging.shonan_helper import read_rotation_data,generate_rotation_edge,generate_g20_data_file
-from shonan_averaging.myconfig_perpend import *
+from shonan_averaging.configs.myconfig_perpend import *
 from mapping.feature_matcher.feature_matcher import FeatureMatcher
 
 def run():
