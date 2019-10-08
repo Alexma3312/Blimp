@@ -37,7 +37,7 @@ class MappingBackEnd():
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20, ransac_enable=True):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20, ransac_enable=False):
         """Construct by reading from a data directory."""
         # Parameters for CV2 find Essential matrix
         self._cv_prob = prob
