@@ -229,9 +229,12 @@ class MappingBackEnd():
                 pose = self._pose_estimates[pose_idx]
                 estimate_landmark = self.back_projection(
                     key_point, pose, self._depth)
-                _x = estimate_landmark.x()+landmark_3d_point[0]
-                _y = estimate_landmark.y()+landmark_3d_point[1]
-                _z = estimate_landmark.z()+landmark_3d_point[2]
+                landmark_3d_point[0] = estimate_landmark.x() + \
+                    landmark_3d_point[0]
+                landmark_3d_point[1] = estimate_landmark.y() + \
+                    landmark_3d_point[1]
+                landmark_3d_point[2] = estimate_landmark.z() + \
+                    landmark_3d_point[2]
             landmark_3d_point = landmark_3d_point/len(observation_list)
             landmark_3d_point = Point3(
                 landmark_3d_point[0, 0], landmark_3d_point[1, 0], landmark_3d_point[2, 0])
