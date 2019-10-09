@@ -37,7 +37,7 @@ class MappingBackEnd():
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20, ransac_enable=False):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20, prior_indices=(0,1),ransac_enable=False):
         """Construct by reading from a data directory."""
         # Parameters for CV2 find Essential matrix
         self._cv_prob = prob
@@ -53,6 +53,7 @@ class MappingBackEnd():
         self._pose_estimates = pose_estimates
         self._measurement_noise = measurement_noise
         self._pose_prior_noise = pose_prior_noise
+        self._prior_indices = prior_indices
         # Store all features and descriptors
         self._image_features = [self.load_features(
             image_index)[0] for image_index in range(self._nrimages)]
@@ -284,7 +285,7 @@ class MappingBackEnd():
         #   pose_noise_sigmas = np.array([rotation_sigma, rotation_sigma, rotation_sigma,
         #                             translation_sigma, translation_sigma, translation_sigma])
         # """
-        for idx in (0, 1):
+        for idx in (self._prior_indices[0], self._prior_indices[1]):
             pose_i = initial_estimate.atPose3(X(idx))
             graph.add(gtsam.PriorFactorPose3(
                 X(idx), pose_i, self._pose_prior_noise))
