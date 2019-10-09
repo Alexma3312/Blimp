@@ -37,7 +37,7 @@ class MappingBackEnd():
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20, prior_indices=(0,1),ransac_enable=False):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20, prior_indices=(0, 1)):
         """Construct by reading from a data directory."""
         # Parameters for CV2 find Essential matrix
         self._cv_prob = prob
@@ -59,7 +59,7 @@ class MappingBackEnd():
             image_index)[0] for image_index in range(self._nrimages)]
         self._image_descriptors = [self.load_features(
             image_index)[1] for image_index in range(self._nrimages)]
-        landmark_map, dsf = self.create_landmark_map(ransac_enable)
+        landmark_map, dsf = self.create_landmark_map()
         self._landmark_map = self.filter_bad_landmarks(
             landmark_map, dsf, filter_bad_landmarks_enable)
 
@@ -82,47 +82,13 @@ class MappingBackEnd():
         _, matches = get_matches(matches_file)
         return matches
 
-    def ransac_filter_keypoints(self, matches, idx1, idx2):
-        """Use opencv ransac to filter matches."""
-        src = np.array([], dtype=np.float).reshape(0, 2)
-        dst = np.array([], dtype=np.float).reshape(0, 2)
-        for match in matches:
-            kp_src = self._image_features[idx1][int(match[1])]
-            kp_dst = self._image_features[idx2][int(match[3])]
-            src = np.vstack((src, [float(kp_src.x()), float(kp_src.y())]))
-            dst = np.vstack((dst, [float(kp_dst.x()), float(kp_dst.y())]))
-
-        if src.shape[0] < 6:
-            return True, []
-
-        src = np.expand_dims(src, axis=1)
-        dst = np.expand_dims(dst, axis=1)
-        # Essential Matrix and RANSAC filter
-        _, mask = cv2.findEssentialMat(
-            dst, src, cameraMatrix=self._calibration.matrix(), method=cv2.RANSAC, prob=self._cv_prob, threshold=self._cv_threshold)
-        # Fundamental Matrix and RANSAC filter
-        # _, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 0.01, 0.999)
-        if mask is None:
-            return True, np.array([])
-
-        good_matches = [matches[i]
-                        for i, score in enumerate(mask) if score == 1]
-        return False, good_matches
-
-    def generate_dsf(self, enable=True):
+    def generate_dsf(self):
         """Use dsf to find data association between landmark and landmark observation(features)"""
         dsf = gtsam.DSFMapIndexPair()
 
         for i in range(0, self._nrimages-1):
             for j in range(i+1, self._nrimages):
                 matches = self.load_matches(i, j)
-                if enable:
-                    bad_essential, matches = self.ransac_filter_keypoints(
-                        matches, i, j)
-                    if bad_essential:
-                        print(
-                            "Not enough points to generate essential matrix for image_", i, " and image_", j)
-                        continue
                 for frame_1, keypt_1, frame_2, keypt_2 in matches:
                     dsf.merge(gtsam.IndexPair(frame_1, keypt_1),
                               gtsam.IndexPair(frame_2, keypt_2))
@@ -183,10 +149,10 @@ class MappingBackEnd():
 
         return landmark_map_new
 
-    def create_landmark_map(self, enable=True):
+    def create_landmark_map(self):
         """Create a list to map landmarks and their correspondences.
             [Landmark_i:[(i,Point2()), (j,Point2())...]...]"""
-        dsf = self.generate_dsf(enable)
+        dsf = self.generate_dsf()
         landmark_map = defaultdict(list)
         for img_index, feature_list in enumerate(self._image_features):
             for feature_index, feature in enumerate(feature_list):
@@ -230,12 +196,9 @@ class MappingBackEnd():
                 pose = self._pose_estimates[pose_idx]
                 estimate_landmark = self.back_projection(
                     key_point, pose, self._depth)
-                landmark_3d_point[0] = estimate_landmark.x() + \
-                    landmark_3d_point[0]
-                landmark_3d_point[1] = estimate_landmark.y() + \
-                    landmark_3d_point[1]
-                landmark_3d_point[2] = estimate_landmark.z() + \
-                    landmark_3d_point[2]
+                landmark_3d_point[0] += estimate_landmark.x()
+                landmark_3d_point[1] += estimate_landmark.y()
+                landmark_3d_point[2] += estimate_landmark.z()
             landmark_3d_point = landmark_3d_point/len(observation_list)
             landmark_3d_point = Point3(
                 landmark_3d_point[0, 0], landmark_3d_point[1, 0], landmark_3d_point[2, 0])
