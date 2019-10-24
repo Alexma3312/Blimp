@@ -43,4 +43,6 @@ class Features():
         """Return length"""
         assert len(self.keypoints) == len(
             self.descriptors), "Lengths of Keypoints and Descriptors are different."
-        return len(self.keypoints)
+        if self.keypoints:
+            return len(self.keypoints)
+        return 0
