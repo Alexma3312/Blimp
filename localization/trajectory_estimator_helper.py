@@ -63,12 +63,12 @@ def save_match_image(dir_name, observations, keypoints, color_image, index):
     # Extra output -- Show current point detections.
     for i, observation in enumerate(observations):
         pt1 = (int(round(observation[0].x())), int(round(observation[0].y())))
-        cv2.circle(color_image, pt1, 1, (0, 255, 0), -1, lineType=16)
+        cv2.circle(color_image, pt1, 5, (0, 255, 0), -1, lineType=16)
         pt2 = keypoints[i]
         pt2 = (int(round(pt2[0])), int(round(pt2[1])))
         cv2.circle(color_image, pt2, 2, (255, 0, 0), -1, lineType=16)
         cv2.line(color_image, pt1, pt2, (0, 0, 0), 1)
-        cv2.putText(color_image, 'Green is extract features and Red is project features.',
+    cv2.putText(color_image, 'Green is extract features and Red is project features.',
                     FONT_PT, FONT, FONT_SC, FONT_CLR, lineType=16)
 
     if not os.path.exists(dir_name):

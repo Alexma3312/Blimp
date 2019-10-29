@@ -226,3 +226,121 @@ def pose_estimate_generator_quad(theta, delta_x, delta_y, delta_z, prior1_delta,
     image_poses[:0] = [prior_1]
 
     return image_poses
+
+def pose_estimate_generator_4x3x1_rot(theta, delta_x, delta_y, delta_z, rows, cols, angles, wRw2=np.identity(3)):
+    """Generate pose estimates for mapping.
+        Parameters:
+            theta - int, angle of rotation
+            delta_x - int list, delta distance along x axis
+            delta_y - int list, delta distance along y axis
+            delta_z - int, height
+            prior1_delta - list, [x,y,z,rotation angle]
+            prior2_delta - list, [x,y,z,rotation angle]
+            rows - int, number of rows, along x axis
+            cols - int, number of columns, along y axis
+            angles - int, number of angles
+            wRw2 - numpy array, rotation of the pose estimate grid
+                np.array([[math.cos(theta), 0, -math.sin(theta)], [0, 1, 0], [math.sin(theta), 0, math.cos(theta)]])
+    """
+    # Camera to world rotation
+    wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0).matrix()
+    wRc2 = Rot3(np.dot(wRw2, wRc)).matrix()
+
+    def image_pose(i):
+        y_idx = i // (cols*angles)
+        x_idx = (i % (cols*angles))//angles
+        angle_idx = (i % (cols*angles)) % angles
+        # Basic rotation along z axis
+        if x_idx == 0:
+            degree = math.radians(-theta)
+            Rz = np.array([[math.cos(degree), -math.sin(degree), 0],
+                        [math.sin(degree), math.cos(degree), 0], [0, 0, 1]])
+        if x_idx == 1:
+            degree = math.radians(0)
+            Rz = np.array([[math.cos(degree), -math.sin(degree), 0],
+                        [math.sin(degree), math.cos(degree), 0], [0, 0, 1]])
+        if x_idx == 2:
+            degree = math.radians(theta)
+            Rz = np.array([[math.cos(degree), -math.sin(degree), 0],
+                        [math.sin(degree), math.cos(degree), 0], [0, 0, 1]])
+        rotation = Rot3(np.dot(Rz, wRc2))
+        translation = Point3(delta_x[x_idx], delta_y[y_idx], delta_z)
+        image_pose = Pose3(rotation, translation)
+        return image_pose
+
+    image_poses = [image_pose(i) for i in range(rows*cols*angles)]
+
+    return image_poses
+
+def pose_estimate_generator_4x3x1_360(theta, delta_x, delta_y, delta_z, rows, cols, angles, wRw2=np.identity(3)):
+    """Generate pose estimates for mapping.
+        Parameters:
+            theta - int, angle of rotation
+            delta_x - int list, delta distance along x axis
+            delta_y - int list, delta distance along y axis
+            delta_z - int, height
+            prior1_delta - list, [x,y,z,rotation angle]
+            prior2_delta - list, [x,y,z,rotation angle]
+            rows - int, number of rows, along x axis
+            cols - int, number of columns, along y axis
+            angles - int, number of angles
+            wRw2 - numpy array, rotation of the pose estimate grid
+                np.array([[math.cos(theta), 0, -math.sin(theta)], [0, 1, 0], [math.sin(theta), 0, math.cos(theta)]])
+    """
+    # Camera to world rotation
+    wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0).matrix()
+    wRc2 = Rot3(np.dot(wRw2, wRc)).matrix()
+
+    def image_pose(i):
+        y_idx = i // (cols*angles)
+        x_idx = (i % (cols*angles))//angles
+
+        # Basic rotation along z axis
+        degree = math.radians(-theta+theta*(cols-1)*y_idx+theta*x_idx)
+        Rz = np.array([[math.cos(degree), -math.sin(degree), 0],
+                    [math.sin(degree), math.cos(degree), 0], [0, 0, 1]])
+        rotation = Rot3(np.dot(Rz, wRc2))
+        translation = Point3(delta_x[x_idx], delta_y[y_idx], delta_z)
+        image_pose = Pose3(rotation, translation)
+        return image_pose
+
+    image_poses = [image_pose(i) for i in range(rows*cols*angles)]
+
+    return image_poses
+
+
+def pose_estimate_generator_rectangle_no_prior(theta, delta_x, delta_y, delta_z, rows, cols, angles, wRw2=np.identity(3)):
+    """Generate pose estimates for mapping.
+        Parameters:
+            theta - int, angle of rotation
+            delta_x - int list, delta distance along x axis
+            delta_y - int list, delta distance along y axis
+            delta_z - int, height
+            prior1_delta - list, [x,y,z,rotation angle]
+            prior2_delta - list, [x,y,z,rotation angle]
+            rows - int, number of rows, along x axis
+            cols - int, number of columns, along y axis
+            angles - int, number of angles
+            wRw2 - numpy array, rotation of the pose estimate grid
+                np.array([[math.cos(theta), 0, -math.sin(theta)], [0, 1, 0], [math.sin(theta), 0, math.cos(theta)]])
+    """
+    # Camera to world rotation
+    wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0).matrix()
+    wRc2 = Rot3(np.dot(wRw2, wRc)).matrix()
+
+    def image_pose(i):
+        y_idx = i // (cols*angles)
+        x_idx = (i % (cols*angles))//angles
+        angle_idx = (i % (cols*angles)) % angles
+        # Basic rotation along z axis
+        degree = math.radians(theta*angle_idx)
+        Rz = np.array([[math.cos(degree), -math.sin(degree), 0],
+                       [math.sin(degree), math.cos(degree), 0], [0, 0, 1]])
+        rotation = Rot3(np.dot(Rz, wRc2))
+        translation = Point3(delta_x[x_idx], delta_y[y_idx], delta_z)
+        image_pose = Pose3(rotation, translation)
+        return image_pose
+
+    image_poses = [image_pose(i) for i in range(rows*cols*angles)]
+
+    return image_poses

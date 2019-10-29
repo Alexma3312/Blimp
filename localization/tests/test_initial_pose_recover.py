@@ -10,7 +10,7 @@ from localization.trajectory_estimator import TrajectoryEstimator
 import unittest
 from gtsam.utils.test_case import GtsamTestCase
 from utilities.plotting import plot_trajectory_verification
-from feature_matcher.mapping_result_helper import load_poses_from_file
+from mapping.bundle_adjustment.mapping_result_helper import load_poses_from_file
 
 
 class TestInitialPoseRecover(GtsamTestCase):

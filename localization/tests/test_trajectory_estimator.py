@@ -63,7 +63,23 @@ class TestTrajectoryEstimator(GtsamTestCase):
             trajectory_estimator.l2_thresh = 0.7
             assert trajectory_estimator.l2_thresh is 0.7
     
-    def test_superpoint()
+    def test_superpoint_generator(self):
+        pass
+
+    def test_landmark_projection(self):
+        pass
+
+    def test_find_find_keypoints_within_boundingbox(self):
+        pass
+
+    def test_find_smallest_l2_distance_keypoint(self):
+        pass
+
+    def test_landmark_association(self):
+        pass
+
+    def test_DLT_ransac(self):
+        pass
 
 
 if __name__ == "__main__":

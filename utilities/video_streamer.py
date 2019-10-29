@@ -5,6 +5,7 @@ import glob
 import os
 
 import cv2
+from PIL import Image
 
 
 class VideoStreamer():
@@ -22,7 +23,7 @@ class VideoStreamer():
         start_index - the number of frames to jump at the beginning
     """
 
-    def __init__(self, basedir, camid, height, width, skip, img_glob,start_index):
+    def __init__(self, basedir, camid, height, width, skip, img_glob, start_index):
         self.cap = []
         self.camera = False
         self.video_file = False
@@ -56,7 +57,8 @@ class VideoStreamer():
                 print('==> Processing Image Directory Input.')
                 search = os.path.join(basedir, img_glob)
                 self.listing = glob.glob(search)
-                self.listing.sort()
+                # self.listing.sort()
+                self.listing.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
                 self.listing = self.listing[::self.skip]
                 self.maxlen = len(self.listing)
                 if self.maxlen == 0:
@@ -88,30 +90,34 @@ class VideoStreamer():
            status: True or False depending whether image was loaded.
         """
         if self.i == self.maxlen:
-            return (None, False)
+            return (None,None, False)
         if self.camera:
             ret, input_image = self.cap.read()
             if ret is False:
                 print('VideoStreamer: Cannot get image from camera (maybe bad --camid?)')
-                return (None, False)
+                return (None,None, False)
             # Skip the first all black frame
             if self.i < self.start_index:
                 self.i += 1
-                return (None, True)
+                return (None,None, True)
             if self.i < self.skip:
                 self.i += 1
-                return (None, True)
+                return (None,None, True)
             if self.video_file:
                 self.cap.set(cv2.CAP_PROP_POS_FRAMES, self.listing[self.i])
-            input_image = cv2.resize(input_image, (self.sizer[1], self.sizer[0]),
+            resize_image = cv2.resize(input_image, (self.sizer[1], self.sizer[0]),
                                      interpolation=cv2.INTER_AREA)
-            input_image = cv2.cvtColor(input_image, cv2.COLOR_RGB2GRAY)
+            # Get color image for display
+            color_image = resize_image
+            input_image = cv2.cvtColor(resize_image, cv2.COLOR_RGB2GRAY)
             input_image = input_image.astype('float')/255.0
             self.skip += self.skip
         else:
             image_file = self.listing[self.i]
             input_image = self.read_image(image_file, self.sizer)
+            color_image = cv2.imread(image_file)
         # Increment internal counter.
         self.i = self.i + 1
         input_image = input_image.astype('float32')
-        return (input_image, True)
+        
+        return (input_image, color_image, True)
