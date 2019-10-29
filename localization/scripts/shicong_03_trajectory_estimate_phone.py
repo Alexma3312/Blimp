@@ -11,17 +11,22 @@ from mapping.bundle_adjustment.mapping_result_helper import \
     load_poses_from_file
 from utilities.plotting import plot_trajectory_verification, plot_with_result
 from localization.configs.myconfig_phone import *
+from mapping.bundle_adjustment.mapping_result_helper import load_poses_from_file
 
 
 def run():
     """Execution."""
     # Camera to world rotation
-    wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # pylint: disable=invalid-name
-    initial_pose = Pose3(wRc, Point3(0, 0, 1.5))
-    directory_name = "localization/datasets/Klaus_14x4_phone/"
+    # wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # pylint: disable=invalid-name
+    # initial_pose = Pose3(wRc, Point3(0, 0, 1.5))
+    directory_name = "localization/datasets/klaus_15_phone/"
+    poses = load_poses_from_file(directory_name+'map/poses.dat')
+    initial_pose = poses[0]
+    rotation = Rot3(np.array(initial_pose[3:]).reshape(3, 3))
+    initial_pose = Pose3(rotation, Point3(np.array(initial_pose[0:3])))
 
     l2_thresh = 0.7
-    distance_thresh = [5, 5]
+    distance_thresh = [65, 65]
     trajectory_estimator = TrajectoryEstimator(
         initial_pose, directory_name, camera, l2_thresh, distance_thresh, measurement_noise, point_prior_noise)
 
@@ -31,7 +36,8 @@ def run():
     img_glob = "*.jpg"
 
     image_directory_path = directory_name+'/source_images/'
-    trajectory = trajectory_estimator.trajectory_generator(image_directory_path, camid, skip, img_glob, start_index)
+    trajectory = trajectory_estimator.trajectory_generator(
+        image_directory_path, camid, skip, img_glob, start_index)
 
     # actual_poses = load_poses_from_file(directory_name+"poses.dat")
     # plot_trajectory_verification(
