@@ -13,9 +13,10 @@ from gtsam import Point2, Point3, symbol, Pose3
 from localization.features import Features
 from localization.observed_landmarks import ObservedLandmarks
 from SuperPointPretrainedNetwork.demo_superpoint import SuperPointFrontend
-from utilities.plotting import plot_trajectory, plot_map
+from utilities.plotting import plot_trajectory, plot_map, plot_map_ax, plot_trajectory_ax
 from utilities.video_streamer import VideoStreamer
 from localization.trajectory_estimator_helper import save_feature_image, save_feature_to_file, save_match_image
+import time
 
 
 def X(i):  # pylint: disable=invalid-name
@@ -50,6 +51,7 @@ class TrajectoryEstimator():
         self.l2_threshold = l2_threshold
         self.x_distance_thresh = distance_thresh[0]
         self.y_distance_thresh = distance_thresh[1]
+        self._diagonal_thresh = distance_thresh[0]**2 + distance_thresh[1]**2
         self._debug = debug_enable
         self._measurement_noise = measurement_noise
         self._point_prior_noise = point_prior_noise
@@ -115,19 +117,28 @@ class TrajectoryEstimator():
 
     def find_keypoints_within_boundingbox(self, src_keypoint, dst_keypoints):
         """Find points within a bounding box around a given keypoint."""
-        def get_nearby_index(i, dst_keypoint):
-            """Check both x and y distances."""
-            x_diff = abs(dst_keypoint[0] - src_keypoint[0])
-            y_diff = abs(dst_keypoint[1] - src_keypoint[1])
-            if(x_diff < self.x_distance_thresh and y_diff < self.y_distance_thresh):
-                return i
-            pass
-        nearby_indices = [get_nearby_index(
-            i, dst_keypoint) for i, dst_keypoint in enumerate(dst_keypoints)]
-        return list(filter(None.__ne__, nearby_indices))
+        dst_keypoints = np.array(dst_keypoints)
+        x_diff = dst_keypoints[:, 0] - src_keypoint[0]
+        y_diff = dst_keypoints[:, 1] - src_keypoint[1]
+        diff = np.multiply(x_diff, x_diff) + np.multiply(y_diff, y_diff)
+        nearby_indices = [i for i in range(
+            len(dst_keypoints)) if diff[i] < self._diagonal_thresh]
+        return nearby_indices
 
     def find_smallest_l2_distance_keypoint(self, feature_indices, features, landmark, landmark_desc):
         """Find the keypoint with the smallest l2 distance within the bounding box."""
+        # Vectorization is slower?
+        # descriptors = np.array(features.descriptors)[feature_indices,:]
+        # dmat = np.dot(descriptors, np.array(landmark_desc).T)
+        # dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
+        # min_score = self.l2_threshold
+        # for i,feature_index in enumerate(feature_indices):
+        #     if dmat[i] < min_score:
+        #         min_score = dmat[i]
+        #         key_point = features.keypoints[feature_index]
+        # if min_score < self.l2_threshold:
+        #     return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
+
         min_score = self.l2_threshold
         for feature_index in feature_indices:
             # Compute L2 distance. Easy since vectors are unit normalized. This method is from the superpoint pretrain script.
@@ -171,10 +182,10 @@ class TrajectoryEstimator():
         observations = [associate_features_to_map(
             i, projected_point) for i, projected_point in enumerate(observed_landmarks.keypoints)]
 
-        match_keypoints = [observation[1] for observation in observations]
-        observations = [observation[0] for observation in observations]
-        # Filter None elements in the list
-        observations = list(filter(None.__ne__, observations))
+        match_keypoints = [observation[1]
+                           for observation in observations if observation[0]]
+        observations = [observation[0]
+                        for observation in observations if observation[0]]
 
         return observations, match_keypoints
 
@@ -186,6 +197,11 @@ class TrajectoryEstimator():
                 pose - Pose3
                 new_observations - a list, [(Point2(), Point3())]
         """
+        # Use opencv to solve PnP ransac
+        # https://www.learnopencv.com/head-pose-estimation-using-opencv-and-dlib/
+
+        # new estimate pose  = cv2.solvePnPRansac
+        # Use the new estimate pose to back project the observed 3D points to select for outlier
         pass
 
     def BA_pose_estimation(self, observations, estimated_pose):
@@ -220,12 +236,15 @@ class TrajectoryEstimator():
         current_pose = result.atPose3(X(0))
         return current_pose
 
-    def pose_estimator(self, image, frame_count, pre_pose, color_image, save_for_debug=True):
+    def pose_estimator(self, image, frame_count, pre_pose, color_image, save_for_debug=False):
         """The full pipeline to estimates the current pose."""
         # """
         # Superpoint Feature Extraction.
         # """
+        tic_ba = time.time()
         superpoint_features = self.superpoint_generator(image)
+        toc_ba = time.time()
+        print('Superpoint Extraction spents ', toc_ba-tic_ba, 's')
         # Check if to see if features are empty.
         if superpoint_features.get_length() == 0:
             print("No feature extracted.")
@@ -242,7 +261,10 @@ class TrajectoryEstimator():
         # """
         # Landmark Backprojection.
         # """
+        tic_ba = time.time()
         observed_landmarks = self.landmark_projection(pre_pose)
+        toc_ba = time.time()
+        print('Landmark Projection spents ', toc_ba-tic_ba, 's')
         # Check if to see if the observed landmarks is empty.
         if observed_landmarks.get_length() == 0:
             print("No projected landmarks.")
@@ -263,8 +285,11 @@ class TrajectoryEstimator():
         # """
         # Landmark Association.
         # """
+        tic_ba = time.time()
         observations, keypoints = self.landmark_association(
             superpoint_features, observed_landmarks)
+        toc_ba = time.time()
+        print('Landmark Association spents ', toc_ba-tic_ba, 's')
         # Check if to see if the associate landmarks is empty.
         if not observations:
             print("No projected landmarks.")
@@ -274,25 +299,26 @@ class TrajectoryEstimator():
             save_match_image(self._directory_name+"match_images/",
                              observations, keypoints, np.copy(color_image), frame_count)
 
+        # If number of observations<6 pass
+        if len(observations) < 6:
+            print("Number of Observations less than 6.")
+            return Pose3(), False
+
         # """
         # 6 Point DLT RANSAC.
         # """
         # TODO:estimated_pose, new_observations = self.DLT_ransac(observations)
         # TODO:Check estimated_pose and prepose
 
-        # # If number of observations<6 pass
-        # if len(observations) < 6:
-        #     print("NUmber of Observations less than 6.")
-        #     return Pose3(), False
-
         # """
         # Bundle Adjustment.
         # """
-        # TODO: If number of observations<6 pass
-        # current_pose = self.BA_pose_estimation(observations, pre_pose)
+        tic_ba = time.time()
+        current_pose = self.BA_pose_estimation(observations, pre_pose)
+        toc_ba = time.time()
+        print('BA spents ', toc_ba-tic_ba, 's')
 
-        # return current_pose, True
-        return Pose3(), True
+        return current_pose, True
 
     def trajectory_generator(self, input_src, camid, skip, img_glob, start_index):
         """The top level function, use to generate trajectory.
@@ -315,9 +341,11 @@ class TrajectoryEstimator():
         vs = VideoStreamer(input_src, camid, height, width,
                            skip, img_glob, start_index)
         # Display the map
-        figure_number = 1
-        plot_map(self.map.landmarks, figure_number)
-        plt.show()
+        fig = plt.figure(figsize=(10, 4))
+        ax1 = fig.add_subplot(1, 2, 1, projection='3d')
+        ax2 = fig.add_subplot(1, 2, 2)
+        plot_map_ax(self.map.landmarks, ax1)
+        plt.show(block=False)
 
         # Help to index the input image
         frame_count = 0
@@ -338,13 +366,12 @@ class TrajectoryEstimator():
                 continue
             trajectory.append(current_pose)
 
-            plot_trajectory(trajectory, figure_number)
-            plt.show(block=False)
-            # if self._debug is True:
-            #     cv2.imshow('image', color_image)
-            #     cv2.waitKey(0)
-            #     if cv2.waitKey(0) & 0xFF == ord('b'):
-            #         break
+            if self._debug is True:
+                ax2.imshow(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
+                plot_trajectory_ax(trajectory, ax1)
+
+                plt.show(block=False)
+
             frame_count += 1
 
         # cv2.destoryAllWindows()
