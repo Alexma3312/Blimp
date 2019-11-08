@@ -17,6 +17,10 @@ from utilities.plotting import plot_trajectory, plot_map, plot_map_ax, plot_traj
 from utilities.video_streamer import VideoStreamer
 from localization.trajectory_estimator_helper import save_feature_image, save_feature_to_file, save_match_image
 import time
+from sklearn.neighbors import NearestNeighbors
+import math
+from sklearn.metrics import pairwise_distances_argmin_min
+
 
 
 def X(i):  # pylint: disable=invalid-name
@@ -74,7 +78,7 @@ class TrajectoryEstimator():
                                 nms_dist=4,
                                 conf_thresh=0.015,
                                 nn_thresh=0.7,
-                                cuda=False)
+                                cuda=True)
         superpoints, descriptors, _ = fe.run(image)
 
         return Features(superpoints[:2, ].T.tolist(), descriptors.T.tolist())
@@ -129,14 +133,12 @@ class TrajectoryEstimator():
         """Find the keypoint with the smallest l2 distance within the bounding box."""
         # Vectorization is slower?
         # descriptors = np.array(features.descriptors)[feature_indices,:]
-        # dmat = np.dot(descriptors, np.array(landmark_desc).T)
+        # dmat = np.dot(descriptors, np.array([landmark_desc]).T)
         # dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
-        # min_score = self.l2_threshold
-        # for i,feature_index in enumerate(feature_indices):
-        #     if dmat[i] < min_score:
-        #         min_score = dmat[i]
-        #         key_point = features.keypoints[feature_index]
+        # min_score = np.amin(dmat)
         # if min_score < self.l2_threshold:
+        #     feature_index = np.where(dmat == min_score)
+        #     key_point = features.keypoints[int(feature_index[0])]
         #     return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
 
         min_score = self.l2_threshold
@@ -151,6 +153,15 @@ class TrajectoryEstimator():
                 key_point = features.keypoints[feature_index]
         if min_score < self.l2_threshold:
             return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
+        
+        # sklearn
+        # descriptors = np.array(features.descriptors)[feature_indices,:]
+        # landmark_desc = np.array([landmark_desc])
+
+        # feature_index, min_score = pairwise_distances_argmin_min(descriptors, landmark_desc)
+        # if min_score[0] < self.l2_threshold:
+        #     key_point = features.keypoints[feature_index[0]]
+        #     return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
 
     def landmark_association(self, superpoint_features, observed_landmarks):
         """ Associate Superpoint feature points with landmark points by matching all superpoint features with projected features.
@@ -167,6 +178,46 @@ class TrajectoryEstimator():
         # If the map contains less noise and more structure, which means if we trust the map.
         # Then we map the extracted feature to the observed landmarks.
         # """"
+        
+
+        # """"
+        # Test with knn
+        # """"
+        tic_ba = time.time()
+        samples = superpoint_features.keypoints
+        neigh = NearestNeighbors(radius=65.0)
+        #neigh = NearestNeighbors(60)
+        neigh.fit(samples)
+        NearestNeighbors(algorithm='kd_tree', leaf_size=30)
+        toc_ba = time.time()
+        print('KNN spents ', toc_ba-tic_ba, 's')
+
+        def associate_features_to_map_knn(i, projected_point):
+            """Associate features to the projected feature points."""
+            # Calculate the pixels distances between current superpoint and all the points in the map
+            tic_ba = time.time()
+            # _, indices = neigh.kneighbors(np.array([projected_point]))
+            _, indices = neigh.radius_neighbors(np.array([projected_point]), radius =65)
+            toc_ba = time.time()
+            print('KNN Find Nearby Indices spents ', toc_ba-tic_ba, 's')
+            nearby_indices =indices[0].tolist()
+            
+            tic_ba = time.time()
+            nearby_indices = self.find_keypoints_within_boundingbox(
+                projected_point, superpoint_features.keypoints)
+            toc_ba = time.time()
+            print('Find Nearby Indices spents ', toc_ba-tic_ba, 's')
+
+            # If no matches, continue
+            if nearby_indices == []:
+                pass
+            # If there are more than one feature in the bounding box, return the keypoint with the smallest l2 distance
+            # tic_ba = time.time()
+            keypoint = self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmarks[i], observed_landmarks.descriptors[i]), observed_landmarks.keypoints[i]
+            # toc_ba = time.time()
+            # print('Find keypoint spents ', toc_ba-tic_ba, 's')
+            return keypoint
+
 
         def associate_features_to_map(i, projected_point):
             """Associate features to the projected feature points."""
@@ -179,7 +230,7 @@ class TrajectoryEstimator():
             # If there are more than one feature in the bounding box, return the keypoint with the smalles l2 distance
             return self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmarks[i], observed_landmarks.descriptors[i]), observed_landmarks.keypoints[i]
 
-        observations = [associate_features_to_map(
+        observations = [associate_features_to_map_knn(
             i, projected_point) for i, projected_point in enumerate(observed_landmarks.keypoints)]
 
         match_keypoints = [observation[1]
@@ -344,8 +395,8 @@ class TrajectoryEstimator():
         fig = plt.figure(figsize=(10, 4))
         ax1 = fig.add_subplot(1, 2, 1, projection='3d')
         ax2 = fig.add_subplot(1, 2, 2)
-        plot_map_ax(self.map.landmarks, ax1)
-        plt.show(block=False)
+        # plot_map_ax(self.map.landmarks, ax1)
+        # plt.show(block=False)
 
         # Help to index the input image
         frame_count = 0
@@ -364,6 +415,11 @@ class TrajectoryEstimator():
             if not status:
                 frame_count += 1
                 continue
+
+            # If current pose too different from previous pose, use the previous pose
+            distance = np.linalg.norm(current_pose.translation().vector() - pre_pose.translation().vector())
+            if distance > 1:
+                 current_pose = pre_pose
             trajectory.append(current_pose)
 
             if self._debug is True:

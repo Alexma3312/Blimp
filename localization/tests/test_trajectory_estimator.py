@@ -14,7 +14,9 @@ from localization.observed_landmarks import ObservedLandmarks
 from localization.trajectory_estimator import TrajectoryEstimator
 from utilities.back_projection import back_projection
 from mock import patch
-
+import numpy as np
+from sklearn.neighbors import NearestNeighbors
+from sklearn.neighbors import RadiusNeighborsClassifier
 
 def create_dummy_map(directory):
     """Create a dummy map to test trajectory estimator."""
@@ -80,6 +82,38 @@ class TestTrajectoryEstimator(GtsamTestCase):
 
     def test_DLT_ransac(self):
         pass
+
+    def test_knn(self):
+        # projected_points = np.array([[1,2],[1,1],[1,0.5],[1,0.8],[10,10],[20,20],[20,21],[20,19]])
+        projected_points = np.array([[1,2],[1,1],[1,0.5],[1,0.8],[10,10],[20,20],[20,21],[20,19]])
+        extracted_points = np.array([[1,1],[20,20]])
+        neigh = NearestNeighbors(n_neighbors=3)
+        neigh.fit(projected_points) 
+        NearestNeighbors(algorithm='auto', leaf_size=30)
+        test = np.array([[1,1]])
+        _, indies = neigh.kneighbors(test)
+
+
+        # print(neigh.kneighbors([[1,1]]))
+        # print(projected_points[indies])
+        # indies =indies[0].tolist()
+        # indies=indies
+
+    def test_radius_classifier(self):
+        projected_points = np.array([[1,2],[1,1],[1,0.5],[1,0.8],[10,10],[20,20],[20,21],[20,19]])
+        extracted_points = np.array([[1,1],[20,20]])
+        neigh = NearestNeighbors(n_neighbors=3)
+        NearestNeighbors(algorithm='auto', leaf_size=30)
+        neigh.fit(projected_points)
+
+        test = np.array([[1,1]])
+        _, indies = neigh.radius_neighbors(test, radius = 0.5)
+
+        print(neigh.radius_neighbors(test))
+        print(projected_points[indies[0]])
+        indies =indies[0].tolist()
+        indies=indies
+        
 
 
 if __name__ == "__main__":

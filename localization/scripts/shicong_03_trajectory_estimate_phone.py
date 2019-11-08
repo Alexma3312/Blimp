@@ -25,7 +25,7 @@ def run():
     rotation = Rot3(np.array(initial_pose[3:]).reshape(3, 3))
     initial_pose = Pose3(rotation, Point3(np.array(initial_pose[0:3])))
 
-    l2_thresh = 0.7
+    l2_thresh = 0.6
     distance_thresh = [65, 65]
     trajectory_estimator = TrajectoryEstimator(
         initial_pose, directory_name, camera, l2_thresh, distance_thresh, measurement_noise, point_prior_noise)
