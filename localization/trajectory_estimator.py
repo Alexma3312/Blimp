@@ -34,7 +34,18 @@ def P(j):  # pylint: disable=invalid-name
 
 
 class TrajectoryEstimator():
-    """Trajectory Estimator"""
+    """Estimate current pose based on input frame and the previous pose.\n    
+    Parameters:\n
+        initial pose:
+        directory name:
+        map:
+        camera:
+        l2 threshold:
+        distance thresh:
+        debug:
+        measurement noise:
+        point prior noise:
+    """
 
     def __init__(self, initial_pose, directory_name, camera, l2_threshold, distance_thresh, measurement_noise, point_prior_noise, debug_enable=True):
         self.initial_pose = initial_pose
@@ -61,7 +72,9 @@ class TrajectoryEstimator():
         self._point_prior_noise = point_prior_noise
 
     def load_map(self, landmarks):
-        """Load map data"""
+        """Load map data
+        Member Dependencies:
+        """
         self.map = landmarks
 
     def detect_bad_frame(self, next_frame):
@@ -71,8 +84,10 @@ class TrajectoryEstimator():
 
     def superpoint_generator(self, image):
         """Use superpoint to extract features in the image
+        Arguments:
+            image: array
         Returns:
-            superpoint_features - an *Features* Object
+            superpoint_features: an *Features* Object
         """
         fe = SuperPointFrontend(weights_path="SuperPointPretrainedNetwork/superpoint_v1.pth",
                                 nms_dist=4,
@@ -103,7 +118,7 @@ class TrajectoryEstimator():
             calibration = self._camera.undistort_calibration
 
         observed_landmarks = ObservedLandmarks([], [])
-        for i, landmark_point in enumerate(self.map.landmarks):
+        for i, landmark_point in enumerate(self.map.landmarks):45
             simple_camera = gtsam.SimpleCamera(pose, calibration)
             # feature is gtsam.Point2 object
             landmark_point = Point3(
@@ -132,15 +147,35 @@ class TrajectoryEstimator():
     def find_smallest_l2_distance_keypoint(self, feature_indices, features, landmark, landmark_desc):
         """Find the keypoint with the smallest l2 distance within the bounding box."""
         # Vectorization is slower?
-        # descriptors = np.array(features.descriptors)[feature_indices,:]
-        # dmat = np.dot(descriptors, np.array([landmark_desc]).T)
-        # dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
-        # min_score = np.amin(dmat)
-        # if min_score < self.l2_threshold:
-        #     feature_index = np.where(dmat == min_score)
-        #     key_point = features.keypoints[int(feature_index[0])]
+        tic_ba = time.time()
+        descriptors = np.array(features.descriptors)
+        toc_ba = time.time()
+        print('0 spents ', toc_ba-tic_ba, 's')
+        tic_ba = time.time()
+        descriptors = descriptors[feature_indices,:]
+        toc_ba = time.time()
+        print('1 spents ', toc_ba-tic_ba, 's')
+
+        tic_ba = time.time()
+        dmat = np.dot(descriptors, np.array([landmark_desc]).T)
+        dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
+        toc_ba = time.time()
+        print('2 spents ', toc_ba-tic_ba, 's')
+
+        tic_ba = time.time()
+        min_score = np.amin(dmat)
+        toc_ba = time.time()
+        print('3 spents ', toc_ba-tic_ba, 's')
+
+        tic_ba = time.time()
+        if min_score < self.l2_threshold:
+            feature_index = np.where(dmat == min_score)
+            key_point = features.keypoints[int(feature_index[0])]
+        toc_ba = time.time()
+        print('4 spents ', toc_ba-tic_ba, 's')
         #     return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
 
+        tic_ba = time.time()
         min_score = self.l2_threshold
         for feature_index in feature_indices:
             # Compute L2 distance. Easy since vectors are unit normalized. This method is from the superpoint pretrain script.
@@ -153,7 +188,8 @@ class TrajectoryEstimator():
                 key_point = features.keypoints[feature_index]
         if min_score < self.l2_threshold:
             return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
-        
+        toc_ba = time.time()
+        print('5 spents ', toc_ba-tic_ba, 's')
         # sklearn
         # descriptors = np.array(features.descriptors)[feature_indices,:]
         # landmark_desc = np.array([landmark_desc])
@@ -187,7 +223,7 @@ class TrajectoryEstimator():
         samples = superpoint_features.keypoints
         neigh = NearestNeighbors(radius=65.0)
         #neigh = NearestNeighbors(60)
-        neigh.fit(samples)
+        neigh.fit(samples, observed_landmarks.keypoints)
         NearestNeighbors(algorithm='kd_tree', leaf_size=30)
         toc_ba = time.time()
         print('KNN spents ', toc_ba-tic_ba, 's')
@@ -202,11 +238,11 @@ class TrajectoryEstimator():
             print('KNN Find Nearby Indices spents ', toc_ba-tic_ba, 's')
             nearby_indices =indices[0].tolist()
             
-            tic_ba = time.time()
-            nearby_indices = self.find_keypoints_within_boundingbox(
-                projected_point, superpoint_features.keypoints)
-            toc_ba = time.time()
-            print('Find Nearby Indices spents ', toc_ba-tic_ba, 's')
+            # tic_ba = time.time()
+            # nearby_indices = self.find_keypoints_within_boundingbox(
+            #     projected_point, superpoint_features.keypoints)
+            # toc_ba = time.time()
+            # print('Find Nearby Indices spents ', toc_ba-tic_ba, 's')
 
             # If no matches, continue
             if nearby_indices == []:
@@ -229,14 +265,20 @@ class TrajectoryEstimator():
                 pass
             # If there are more than one feature in the bounding box, return the keypoint with the smalles l2 distance
             return self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmarks[i], observed_landmarks.descriptors[i]), observed_landmarks.keypoints[i]
-
+        
+        tic_ba = time.time()
         observations = [associate_features_to_map_knn(
             i, projected_point) for i, projected_point in enumerate(observed_landmarks.keypoints)]
+        toc_ba = time.time()
+        print('observations spents ', toc_ba-tic_ba, 's')
 
+        tic_ba = time.time()
         match_keypoints = [observation[1]
                            for observation in observations if observation[0]]
         observations = [observation[0]
                         for observation in observations if observation[0]]
+        toc_ba = time.time()
+        print('Get data spents ', toc_ba-tic_ba, 's')
 
         return observations, match_keypoints
 
