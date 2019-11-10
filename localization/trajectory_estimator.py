@@ -151,14 +151,61 @@ class TrajectoryEstimator():
 
     def find_smallest_l2_distance_keypoint(self, feature_indices, features, landmark, landmark_desc):
         """Find the keypoint with the smallest l2 distance within the bounding box."""
-        descriptors = features.descriptors[feature_indices,:]
-        dmat = scipy.linalg.blas.dgemm(alpha=1., a=descriptors, b=landmark_desc.reshape(1,256), trans_b=True)
 
-        # tic_ba = time.time()        
-        # dmat2 = np.dot(descriptors, landmark_desc.T.reshape(256,1))
+        # tic_ba = time.time() 
+        # descriptors = features.descriptors[feature_indices]
         # toc_ba = time.time()
+        # print('1 spents ', toc_ba-tic_ba, 's')
 
-        dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
+        # tic_ba = time.time() 
+        # features.descriptors[feature_indices]
+        # toc_ba = time.time()
+        # print('1.2 spents ', toc_ba-tic_ba, 's')
+
+
+        # tic_ba = time.time() 
+        # features.descriptors[feature_indices.tolist()]
+        # toc_ba = time.time()
+        # print('1.3 spents ', toc_ba-tic_ba, 's')
+        
+        # tic_ba = time.time() 
+        # dmat = scipy.linalg.blas.dgemm(alpha=1., a=descriptors, b=landmark_desc.reshape(1,256), trans_b=True)
+        # toc_ba = time.time()
+        # print('2 spents ', toc_ba-tic_ba, 's')
+
+        # tic_ba = time.time() 
+        dmat = scipy.linalg.blas.dgemm(alpha=1., a=features.descriptors[feature_indices.tolist()], b=np.array([landmark_desc]), trans_b=True)
+        # toc_ba = time.time()
+        # print('2.2 spents ', toc_ba-tic_ba, 's')
+
+        # tic_ba = time.time() 
+        # a = np.clip(dmat, -1, 1)
+        # toc_ba = time.time()
+        # print('3 spents ', toc_ba-tic_ba, 's')
+
+        # dmat12=dmat
+        # tic_ba = time.time() 
+        # dmat12.clip( -1, 1, out=dmat12)
+        # toc_ba = time.time()
+        # print('3.2 spents ', toc_ba-tic_ba, 's')
+
+        # tic_ba = time.time() 
+        # b = 2-2*a
+        # toc_ba = time.time()
+        # print('4 spents ', toc_ba-tic_ba, 's')
+
+        # tic_ba = time.time() 
+        # c= np.sqrt(b)
+        # toc_ba = time.time()
+        # print('5 spents ', toc_ba-tic_ba, 's')
+
+        # tic_ba = time.time() 
+        # np.sqrt(b, out=b)
+        # toc_ba = time.time()
+        # print('5.2 spents ', toc_ba-tic_ba, 's')
+
+        dmat.clip(-1, 1, out = dmat)
+        dmat = np.sqrt(2-2*dmat)
         min_score = np.amin(dmat)
         if min_score < self.l2_threshold:
             feature_index = np.where(dmat == min_score)
@@ -197,33 +244,17 @@ class TrajectoryEstimator():
             """Associate features to the projected feature points."""
             # Calculate the pixels distances between current superpoint and all the points in the map
             _, indices = neigh.radius_neighbors(np.array([projected_point]), radius =65)
-            nearby_indices =indices[0]
 
             # If no matches, continue
-            if nearby_indices.shape[0] == 0:
+            if indices[0].shape[0] == 0:
                 return False, False
 
             # If there are more than one feature in the bounding box, return the keypoint with the smallest l2 distance
-            keypoint = self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmark(i), observed_landmarks.descriptor(i))
+            keypoint = self.find_smallest_l2_distance_keypoint(indices[0], superpoint_features, observed_landmarks.landmark(i), observed_landmarks.descriptor(i))
             return keypoint, observed_landmarks.keypoint(i)
-
-
-
-        # def associate_features_to_map(i, projected_point):
-        #     """Associate features to the projected feature points."""
-        #     # Calculate the pixels distances between current superpoint and all the points in the map
-        #     nearby_indices = self.find_keypoints_within_boundingbox(
-        #         projected_point, superpoint_features.keypoints)
-        #     # If no matches, continue
-        #     if nearby_indices == []:
-        #         pass
-        #     # If there are more than one feature in the bounding box, return the keypoint with the smalles l2 distance
-        #     return self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmarks[i], observed_landmarks.descriptors[i]), observed_landmarks.keypoints[i]
-        
+     
         observations = [associate_features_to_map_knn(
             i, projected_point) for i, projected_point in enumerate(observed_landmarks.keypoints)]
-
-
 
         match_keypoints = [observation[1]
                         for observation in observations if observation[0]]
