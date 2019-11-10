@@ -66,9 +66,17 @@ class TestTrajectoryEstimator(GtsamTestCase):
         pass
 
     def test_find_find_keypoints_within_boundingbox(self):
+
+        # Knn method
+
+        # Vectorization
         pass
 
     def test_find_smallest_l2_distance_keypoint(self):
+
+        # Vectorization
+
+        # Looping
         pass
 
     def test_landmark_association(self):

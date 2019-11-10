@@ -28,7 +28,7 @@ def run():
     l2_thresh = 0.6
     distance_thresh = [65, 65]
     trajectory_estimator = TrajectoryEstimator(
-        initial_pose, directory_name, camera, l2_thresh, distance_thresh, measurement_noise, point_prior_noise)
+        initial_pose, directory_name, camera, l2_thresh, distance_thresh, measurement_noise, point_prior_noise, True, False)
 
     camid = 1
     skip = 1

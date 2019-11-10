@@ -21,6 +21,7 @@ import time
 from sklearn.neighbors import NearestNeighbors
 import math
 from sklearn.metrics import pairwise_distances_argmin_min
+import scipy
 
 
 
@@ -48,7 +49,7 @@ class TrajectoryEstimator():
         point prior noise:
     """
 
-    def __init__(self, initial_pose, directory_name, camera, l2_threshold, distance_thresh, measurement_noise, point_prior_noise, debug_enable=True):
+    def __init__(self, initial_pose, directory_name, camera, l2_threshold, distance_thresh, measurement_noise, point_prior_noise, visualize_enable = True, debug_enable=False):
         self.initial_pose = initial_pose
         self._directory_name = directory_name
 
@@ -56,9 +57,9 @@ class TrajectoryEstimator():
             """Load map data from file."""
             if os.path.isfile(file_name) is False:
                 print("\nFile name does not exist, the map will be empty.")
-                return LandmarkMap([], [])
+                return LandmarkMap(np.array([]), np.array([]))
             landmark_3d_pts, landmark_desc = load_map_from_file(file_name)
-            input_map = LandmarkMap(landmark_3d_pts, landmark_desc)
+            input_map = LandmarkMap(np.array(landmark_3d_pts), np.array(landmark_desc))
             return input_map
         self.map = load_map(directory_name+"/map/map.dat")
         self._camera = camera
@@ -68,6 +69,7 @@ class TrajectoryEstimator():
         self.x_distance_thresh = distance_thresh[0]
         self.y_distance_thresh = distance_thresh[1]
         self._diagonal_thresh = distance_thresh[0]**2 + distance_thresh[1]**2
+        self._visualize = visualize_enable
         self._debug = debug_enable
         self._measurement_noise = measurement_noise
         self._point_prior_noise = point_prior_noise
@@ -133,7 +135,7 @@ class TrajectoryEstimator():
             # Check if the projected feature is within the field of view.
             if (feature_point.x() >= 0 and feature_point.x() < width
                     and feature_point.y() >= 0 and feature_point.y() < height):
-                observed_landmarks.append(self.map.landmarks[i], self.map.descriptors[i], np.array([
+                observed_landmarks.append(self.map.landmark(i), self.map.descriptor(i), np.array([
                                           [feature_point.x(), feature_point.y()]]))
         return observed_landmarks
 
@@ -149,60 +151,23 @@ class TrajectoryEstimator():
 
     def find_smallest_l2_distance_keypoint(self, feature_indices, features, landmark, landmark_desc):
         """Find the keypoint with the smallest l2 distance within the bounding box."""
-        # Vectorization is slower?
-        tic_ba = time.time()
-        descriptors = np.array(features.descriptors)
-        toc_ba = time.time()
-        print('0 spents ', toc_ba-tic_ba, 's')
-        tic_ba = time.time()
-        descriptors = descriptors[feature_indices,:]
-        toc_ba = time.time()
-        print('1 spents ', toc_ba-tic_ba, 's')
+        descriptors = features.descriptors[feature_indices,:]
+        dmat = scipy.linalg.blas.dgemm(alpha=1., a=descriptors, b=landmark_desc.reshape(1,256), trans_b=True)
 
-        tic_ba = time.time()
-        dmat = np.dot(descriptors, np.array([landmark_desc]).T)
+        # tic_ba = time.time()        
+        # dmat2 = np.dot(descriptors, landmark_desc.T.reshape(256,1))
+        # toc_ba = time.time()
+
         dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
-        toc_ba = time.time()
-        print('2 spents ', toc_ba-tic_ba, 's')
-
-        tic_ba = time.time()
         min_score = np.amin(dmat)
-        toc_ba = time.time()
-        print('3 spents ', toc_ba-tic_ba, 's')
-
-        tic_ba = time.time()
         if min_score < self.l2_threshold:
             feature_index = np.where(dmat == min_score)
-            key_point = features.keypoints[int(feature_index[0])]
-        toc_ba = time.time()
-        print('4 spents ', toc_ba-tic_ba, 's')
-        #     return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
-
-        tic_ba = time.time()
-        min_score = self.l2_threshold
-        for feature_index in feature_indices:
-            # Compute L2 distance. Easy since vectors are unit normalized. This method is from the superpoint pretrain script.
-            dmat = np.dot(
-                np.array(features.descriptors[feature_index]), np.array(landmark_desc).T)
-            dmat = np.sqrt(2-2*np.clip(dmat, -1, 1))
-            # Select the minimal L2 distance point
-            if dmat < min_score:
-                min_score = dmat
-                key_point = features.keypoints[feature_index]
-        if min_score < self.l2_threshold:
+            keypoint_index = feature_indices[int(feature_index[0])]
+            key_point = features.keypoint(keypoint_index)
             return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
-        toc_ba = time.time()
-        print('5 spents ', toc_ba-tic_ba, 's')
-        # sklearn
-        # descriptors = np.array(features.descriptors)[feature_indices,:]
-        # landmark_desc = np.array([landmark_desc])
 
-        # feature_index, min_score = pairwise_distances_argmin_min(descriptors, landmark_desc)
-        # if min_score[0] < self.l2_threshold:
-        #     key_point = features.keypoints[feature_index[0]]
-        #     return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
 
-    def landmark_association(self, superpoint_features, observed_landmarks, save_for_debug):
+    def landmark_association(self, superpoint_features, observed_landmarks):
         """ Associate Superpoint feature points with landmark points by matching all superpoint features with projected features.
         Parameters:
             superpoint_features - An *Features* Object
@@ -213,80 +178,59 @@ class TrajectoryEstimator():
 
         """
         # Associate features with points in the map
-        # """
+        # """"
         # If the map contains less noise and more structure, which means if we trust the map.
         # Then we map the extracted feature to the observed landmarks.
         # """"
         
 
         # """"
-        # Test with knn
+        # Initialize KNN
         # """"
-        tic_ba = time.time()
         samples = superpoint_features.keypoints
         neigh = NearestNeighbors(radius=65.0)
-        #neigh = NearestNeighbors(60)
         neigh.fit(samples, observed_landmarks.keypoints)
         NearestNeighbors(algorithm='kd_tree', leaf_size=30)
-        toc_ba = time.time()
-        print('KNN spents ', toc_ba-tic_ba, 's')
+
 
         def associate_features_to_map_knn(i, projected_point):
             """Associate features to the projected feature points."""
             # Calculate the pixels distances between current superpoint and all the points in the map
-            tic_ba = time.time()
-            # _, indices = neigh.kneighbors(np.array([projected_point]))
             _, indices = neigh.radius_neighbors(np.array([projected_point]), radius =65)
-            toc_ba = time.time()
-            print('KNN Find Nearby Indices spents ', toc_ba-tic_ba, 's')
-            nearby_indices =indices[0].tolist()
-            
-            # tic_ba = time.time()
-            # nearby_indices = self.find_keypoints_within_boundingbox(
-            #     projected_point, superpoint_features.keypoints)
-            # toc_ba = time.time()
-            # print('Find Nearby Indices spents ', toc_ba-tic_ba, 's')
+            nearby_indices =indices[0]
 
             # If no matches, continue
-            if nearby_indices == []:
-                pass
+            if nearby_indices.shape[0] == 0:
+                return False, False
+
             # If there are more than one feature in the bounding box, return the keypoint with the smallest l2 distance
-            # tic_ba = time.time()
-            keypoint = self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmarks[i], observed_landmarks.descriptors[i]), observed_landmarks.keypoints[i]
-            # toc_ba = time.time()
-            # print('Find keypoint spents ', toc_ba-tic_ba, 's')
-            return keypoint
+            keypoint = self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmark(i), observed_landmarks.descriptor(i))
+            return keypoint, observed_landmarks.keypoint(i)
 
 
-        def associate_features_to_map(i, projected_point):
-            """Associate features to the projected feature points."""
-            # Calculate the pixels distances between current superpoint and all the points in the map
-            nearby_indices = self.find_keypoints_within_boundingbox(
-                projected_point, superpoint_features.keypoints)
-            # If no matches, continue
-            if nearby_indices == []:
-                pass
-            # If there are more than one feature in the bounding box, return the keypoint with the smalles l2 distance
-            return self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmarks[i], observed_landmarks.descriptors[i]), observed_landmarks.keypoints[i]
+
+        # def associate_features_to_map(i, projected_point):
+        #     """Associate features to the projected feature points."""
+        #     # Calculate the pixels distances between current superpoint and all the points in the map
+        #     nearby_indices = self.find_keypoints_within_boundingbox(
+        #         projected_point, superpoint_features.keypoints)
+        #     # If no matches, continue
+        #     if nearby_indices == []:
+        #         pass
+        #     # If there are more than one feature in the bounding box, return the keypoint with the smalles l2 distance
+        #     return self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmarks[i], observed_landmarks.descriptors[i]), observed_landmarks.keypoints[i]
         
-        tic_ba = time.time()
         observations = [associate_features_to_map_knn(
             i, projected_point) for i, projected_point in enumerate(observed_landmarks.keypoints)]
-        toc_ba = time.time()
-        print('observations spents ', toc_ba-tic_ba, 's')
 
-        if save_for_debug:
-            tic_ba = time.time()
-            match_keypoints = [observation[1]
-                            for observation in observations if observation[0]]
-            observations = [observation[0]
-                            for observation in observations if observation[0]]
-            toc_ba = time.time()
-            print('Get data spents ', toc_ba-tic_ba, 's')
 
-            return observations, match_keypoints
-        else:
-            return observations, []
+
+        match_keypoints = [observation[1]
+                        for observation in observations if observation[0]]
+        observations = [observation[0]
+                        for observation in observations if observation[0]]
+        return observations, match_keypoints
+
 
     def DLT_ransac(self, observations):
         """Use 6 points DLT ransac to filter data and generate initial pose estimation.
@@ -335,7 +279,7 @@ class TrajectoryEstimator():
         current_pose = result.atPose3(X(0))
         return current_pose
 
-    def pose_estimator(self, image, frame_count, pre_pose, color_image, save_for_debug=True):
+    def pose_estimator(self, image, frame_count, pre_pose, color_image):
         """The full pipeline to estimates the current pose."""
         # """
         # Superpoint Feature Extraction.
@@ -349,7 +293,7 @@ class TrajectoryEstimator():
             print("No feature extracted.")
             return Pose3(), False
         #
-        if save_for_debug:
+        if self._debug:
             print('Number of Extracted Features:{}'.format(
                 superpoint_features.get_length()))
             save_feature_to_file(self._directory_name +
@@ -368,7 +312,7 @@ class TrajectoryEstimator():
         if observed_landmarks.get_length() == 0:
             print("No projected landmarks.")
             return Pose3(), False
-        if save_for_debug:
+        if self._debug:
             print('Number of Back Projected Features:{}'.format(
                 observed_landmarks.get_length()))
             save_feature_to_file(
@@ -379,21 +323,21 @@ class TrajectoryEstimator():
         # TODO:save_landmark_to_file()
         # 3d point and poses
         # kp, desc, an image of all feature patch
-        # if save_for_debug:
+        # if self._debug:
 
         # """
         # Landmark Association.
         # """
         tic_ba = time.time()
         observations, keypoints = self.landmark_association(
-            superpoint_features, observed_landmarks, save_for_debug)
+            superpoint_features, observed_landmarks)
         toc_ba = time.time()
         print('Landmark Association spents ', toc_ba-tic_ba, 's')
         # Check if to see if the associate landmarks is empty.
         if not observations:
             print("No projected landmarks.")
             return Pose3(), False
-        if save_for_debug:
+        if self._debug:
             print('Number of Matched Features:{}'.format(len(keypoints)))
             save_match_image(self._directory_name+"match_images/",
                              observations, keypoints, np.copy(color_image), frame_count)
@@ -470,7 +414,7 @@ class TrajectoryEstimator():
                  current_pose = pre_pose
             trajectory.append(current_pose)
 
-            if self._debug is True:
+            if self._visualize is True:
                 ax2.imshow(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
                 plot_trajectory_ax(trajectory, ax1)
 
