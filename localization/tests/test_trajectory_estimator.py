@@ -18,9 +18,16 @@ import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from sklearn.neighbors import RadiusNeighborsClassifier
 
+
 def create_dummy_map(directory):
     """Create a dummy map to test trajectory estimator."""
     pass
+
+
+# https://medium.com/@george.shuklin/mocking-complicated-init-in-python-6ef9850dd202
+with patch.object(TrajectoryEstimator, "__init__", lambda x1, x2, x3, x4, x5, x6, x7, x8: None):
+    trajectory_estimator = TrajectoryEstimator(
+        None, None, None, None, None, None, None)
 
 
 class TestTrajectoryEstimator(GtsamTestCase):
@@ -30,45 +37,32 @@ class TestTrajectoryEstimator(GtsamTestCase):
         """Create noise model for bundle adjustment."""
         pass
 
-    # def test_trajectory_estimator_initialization(self):
-    #     """"""
-    #     measurement_noise_sigma = 1.0
-    #     measurement_noise = gtsam.noiseModel_Isotropic.Sigma(
-    #         2, measurement_noise_sigma)
-    #     point_prior_noise = gtsam.noiseModel_Isotropic.Sigma(3, 0.01)
-
-    #     # Create calibration matrix
-    #     fx = 1406.5/3
-    #     fy = 1317/3
-    #     u0 = 775.2312/3
-    #     v0 = 953.3863/3
-    #     image_size = (640, 480)
-    #     camera = Camera(fx, fy, u0, v0, image_size)
-
-    #     # Camera to world rotation
-    #     wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # pylint: disable=invalid-name
-    #     initial_pose = Pose3(wRc, Point3(0, 0, 1.5))
-    #     directory_name = "localization/datasets/Klaus_14x4_phone/"
-
-    #     l2_thresh = 0.7
-    #     distance_thresh = [5, 5]
-    #     trajectory_estimator = TrajectoryEstimator(
-    #         initial_pose, directory_name, camera, l2_thresh, distance_thresh, measurement_noise, point_prior_noise)
-    #     assert trajectory_estimator.l2_thresh = 0.7
-
     def test_init(self):
         """Mocking complicated __init__ ."""
-        # https://medium.com/@george.shuklin/mocking-complicated-init-in-python-6ef9850dd202
-        with patch.object(TrajectoryEstimator, "__init__", lambda x1, x2, x3, x4, x5, x6, x7, x8: None):
-            trajectory_estimator = TrajectoryEstimator(
-                None, None, None, None, None, None, None)
-            trajectory_estimator.l2_thresh = 0.7
-            assert trajectory_estimator.l2_thresh is 0.7
-    
+        trajectory_estimator.l2_thresh = 0.7
+        assert trajectory_estimator.l2_thresh is 0.7
+
+    @unittest.skip("test_superpoint_generator")
     def test_superpoint_generator(self):
-        pass
+        image = np.zeros((480, 640)).astype(np.float32)
+        image[20:50, 90:400] = 1
+        features = trajectory_estimator.superpoint_generator(image)
+        np.testing.assert_equal(features.descriptors.shape, np.array([4, 256]))
+        np.testing.assert_equal(features.keypoints.shape, np.array([4, 2]))
+        np.testing.assert_equal(features.get_length(), 4)
+        np.testing.assert_equal(
+            features.descriptor(1).shape, np.array([256, ]))
 
     def test_landmark_projection(self):
+        # Create a map with three points - a point within view, a point out of view and a point back of view
+
+        # create pose
+        pose = Pose3(Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0), Point3(0, 0, 0))
+
+        # create camera
+
+        # create estimate observations
+
         pass
 
     def test_find_find_keypoints_within_boundingbox(self):
@@ -83,38 +77,36 @@ class TestTrajectoryEstimator(GtsamTestCase):
     def test_DLT_ransac(self):
         pass
 
-    def test_knn(self):
+    @unittest.skip("test_sklearn_kd_tree_knn")
+    def test_sklearn_kd_tree_knn(self):
         # projected_points = np.array([[1,2],[1,1],[1,0.5],[1,0.8],[10,10],[20,20],[20,21],[20,19]])
-        projected_points = np.array([[1,2],[1,1],[1,0.5],[1,0.8],[10,10],[20,20],[20,21],[20,19]])
-        extracted_points = np.array([[1,1],[20,20]])
+        projected_points = np.array([[1, 2], [1, 1], [1, 0.5], [1, 0.8], [
+                                    10, 10], [20, 20], [20, 21], [20, 19]])
+        extracted_points = np.array([[1, 1], [20, 20]])
         neigh = NearestNeighbors(n_neighbors=3)
-        neigh.fit(projected_points) 
+        neigh.fit(projected_points)
         NearestNeighbors(algorithm='auto', leaf_size=30)
-        test = np.array([[1,1]])
-        _, indies = neigh.kneighbors(test)
-
-
+        test = np.array([[1, 1]])
+        _, indices = neigh.kneighbors(test)
+        indices =indices[0].tolist()
+        np.testing.assert_equal(indices, [1,3,2])
         # print(neigh.kneighbors([[1,1]]))
-        # print(projected_points[indies])
-        # indies =indies[0].tolist()
-        # indies=indies
-
-    def test_radius_classifier(self):
-        projected_points = np.array([[1,2],[1,1],[1,0.5],[1,0.8],[10,10],[20,20],[20,21],[20,19]])
-        extracted_points = np.array([[1,1],[20,20]])
+        # print(projected_points[indices])
+        
+    @unittest.skip("test_sklearn_knn_radius_classifier")
+    def test_sklearn_knn_radius_classifier(self):
+        projected_points = np.array([[1, 2], [1, 1], [1, 0.5], [1, 0.8], [
+                                    10, 10], [20, 20], [20, 21], [20, 19]])
+        extracted_points = np.array([[1, 1], [20, 20]])
         neigh = NearestNeighbors(n_neighbors=3)
         NearestNeighbors(algorithm='auto', leaf_size=30)
         neigh.fit(projected_points)
 
-        test = np.array([[1,1]])
-        _, indies = neigh.radius_neighbors(test, radius = 0.5)
+        test = np.array([[1, 1]])
+        _, indices = neigh.radius_neighbors(test, radius=0.5)
 
-        print(neigh.radius_neighbors(test))
-        print(projected_points[indies[0]])
-        indies =indies[0].tolist()
-        indies=indies
-        
-
+        indices = indices[0].tolist()
+        np.testing.assert_equal(indices, [1,2,3])
 
 if __name__ == "__main__":
     unittest.main()

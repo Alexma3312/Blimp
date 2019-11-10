@@ -12,7 +12,6 @@ from mapping.bundle_adjustment.mapping_result_helper import load_map_from_file
 from gtsam import Point2, Point3, symbol, Pose3
 from localization.features import Features
 from localization.observed_landmarks import ObservedLandmarks
-from localization.landmark_map import LandmarkMap
 from SuperPointPretrainedNetwork.demo_superpoint import SuperPointFrontend
 from utilities.plotting import plot_trajectory, plot_map, plot_map_ax, plot_trajectory_ax
 from utilities.video_streamer import VideoStreamer
@@ -56,9 +55,9 @@ class TrajectoryEstimator():
             """Load map data from file."""
             if os.path.isfile(file_name) is False:
                 print("\nFile name does not exist, the map will be empty.")
-                return LandmarkMap([], [])
+                return ObservedLandmarks([], [])
             landmark_3d_pts, landmark_desc = load_map_from_file(file_name)
-            input_map = LandmarkMap(landmark_3d_pts, landmark_desc)
+            input_map = ObservedLandmarks(landmark_3d_pts, landmark_desc)
             return input_map
         self.map = load_map(directory_name+"/map/map.dat")
         self._camera = camera
@@ -97,18 +96,16 @@ class TrajectoryEstimator():
                                 cuda=True)
         superpoints, descriptors, _ = fe.run(image)
 
-        return Features(superpoints[:2, ].T, descriptors.T)
+        return Features(superpoints[:2, ].T.tolist(), descriptors.T.tolist())
 
     def landmark_projection(self, pose):
         """ Project landmark points in the map to the given camera pose.
-            And filter landmark points outside the view of the current camera pose.\n
-        Parameters:\n
+            And filter landmark points outside the view of the current camera pose.
+        Parameters:
             pose - gtsam.Point3, the pose of a camera
-        Member Dependencies:\n
-            map - An ObservedLandmarks Object
-            camera - 
-        Returns:\n
-            observed landmarks - An ObservedLandmarks Object
+            self.map - An *ObservedLandmarks* Object
+        Returns:
+            observed_landmarks - An *ObservedLandmarks* Object
         """
         # Check if the atrium map is empty
         assert self.map.get_length(), "The map is empty."
@@ -120,7 +117,7 @@ class TrajectoryEstimator():
             height, width = self._camera.undistort_image_size
             calibration = self._camera.undistort_calibration
 
-        observed_landmarks = ObservedLandmarks()
+        observed_landmarks = ObservedLandmarks([], [])
         for i, landmark_point in enumerate(self.map.landmarks):
             simple_camera = gtsam.SimpleCamera(pose, calibration)
             # feature is gtsam.Point2 object
@@ -133,8 +130,8 @@ class TrajectoryEstimator():
             # Check if the projected feature is within the field of view.
             if (feature_point.x() >= 0 and feature_point.x() < width
                     and feature_point.y() >= 0 and feature_point.y() < height):
-                observed_landmarks.append(self.map.landmarks[i], self.map.descriptors[i], np.array([
-                                          [feature_point.x(), feature_point.y()]]))
+                observed_landmarks.append(self.map.landmarks[i], self.map.descriptors[i], [
+                                          feature_point.x(), feature_point.y()])
         return observed_landmarks
 
     def find_keypoints_within_boundingbox(self, src_keypoint, dst_keypoints):
@@ -202,7 +199,7 @@ class TrajectoryEstimator():
         #     key_point = features.keypoints[feature_index[0]]
         #     return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
 
-    def landmark_association(self, superpoint_features, observed_landmarks, save_for_debug):
+    def landmark_association(self, superpoint_features, observed_landmarks):
         """ Associate Superpoint feature points with landmark points by matching all superpoint features with projected features.
         Parameters:
             superpoint_features - An *Features* Object
@@ -275,18 +272,15 @@ class TrajectoryEstimator():
         toc_ba = time.time()
         print('observations spents ', toc_ba-tic_ba, 's')
 
-        if save_for_debug:
-            tic_ba = time.time()
-            match_keypoints = [observation[1]
-                            for observation in observations if observation[0]]
-            observations = [observation[0]
-                            for observation in observations if observation[0]]
-            toc_ba = time.time()
-            print('Get data spents ', toc_ba-tic_ba, 's')
+        tic_ba = time.time()
+        match_keypoints = [observation[1]
+                           for observation in observations if observation[0]]
+        observations = [observation[0]
+                        for observation in observations if observation[0]]
+        toc_ba = time.time()
+        print('Get data spents ', toc_ba-tic_ba, 's')
 
-            return observations, match_keypoints
-        else:
-            return observations, []
+        return observations, match_keypoints
 
     def DLT_ransac(self, observations):
         """Use 6 points DLT ransac to filter data and generate initial pose estimation.
@@ -335,7 +329,7 @@ class TrajectoryEstimator():
         current_pose = result.atPose3(X(0))
         return current_pose
 
-    def pose_estimator(self, image, frame_count, pre_pose, color_image, save_for_debug=True):
+    def pose_estimator(self, image, frame_count, pre_pose, color_image, save_for_debug=False):
         """The full pipeline to estimates the current pose."""
         # """
         # Superpoint Feature Extraction.
@@ -386,7 +380,7 @@ class TrajectoryEstimator():
         # """
         tic_ba = time.time()
         observations, keypoints = self.landmark_association(
-            superpoint_features, observed_landmarks, save_for_debug)
+            superpoint_features, observed_landmarks)
         toc_ba = time.time()
         print('Landmark Association spents ', toc_ba-tic_ba, 's')
         # Check if to see if the associate landmarks is empty.
