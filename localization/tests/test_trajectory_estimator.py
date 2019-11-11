@@ -17,6 +17,7 @@ from mock import patch
 import numpy as np
 from sklearn.neighbors import NearestNeighbors
 from sklearn.neighbors import RadiusNeighborsClassifier
+import cv2
 
 
 def create_dummy_map(directory):
@@ -65,13 +66,6 @@ class TestTrajectoryEstimator(GtsamTestCase):
 
         pass
 
-    def test_find_find_keypoints_within_boundingbox(self):
-
-        # Knn method
-
-        # Vectorization
-        pass
-
     def test_find_smallest_l2_distance_keypoint(self):
 
         # Vectorization
@@ -82,7 +76,35 @@ class TestTrajectoryEstimator(GtsamTestCase):
     def test_landmark_association(self):
         pass
 
-    def test_DLT_ransac(self):
+    def test_pnp_ransac(self):
+        # observations - a list, [(Point2(), Point3())]
+        object_points = np.array([])
+        image_points = np.array([])
+
+        # 12 set of points
+        point_2d_1 = [2, 1]
+        point_3d_1 = [10, 10, 10]
+
+        # 6 set of points
+        # 5 set of points
+
+        expected_pose = np.array([])
+
+        # initial_estimation
+        useExtrinsicGuess = None
+
+        # method - CV_EPNP
+        flags = cv2.CV_EPNP
+
+        # Flag method for solving a PnP problem
+        rvec, tvec, actual_inlier = trajectory_estimator.pnp_ransac()
+
+        pass
+
+    def test_BA_pose_estimation(self):
+        pass
+
+    def test_BA_pose_estimation_with_pnp_ransac_initial(self):
         pass
 
     @unittest.skip("test_sklearn_kd_tree_knn")
@@ -96,11 +118,11 @@ class TestTrajectoryEstimator(GtsamTestCase):
         NearestNeighbors(algorithm='auto', leaf_size=30)
         test = np.array([[1, 1]])
         _, indices = neigh.kneighbors(test)
-        indices =indices[0].tolist()
-        np.testing.assert_equal(indices, [1,3,2])
+        indices = indices[0].tolist()
+        np.testing.assert_equal(indices, [1, 3, 2])
         # print(neigh.kneighbors([[1,1]]))
         # print(projected_points[indices])
-        
+
     @unittest.skip("test_sklearn_knn_radius_classifier")
     def test_sklearn_knn_radius_classifier(self):
         projected_points = np.array([[1, 2], [1, 1], [1, 0.5], [1, 0.8], [
@@ -114,7 +136,8 @@ class TestTrajectoryEstimator(GtsamTestCase):
         _, indices = neigh.radius_neighbors(test, radius=0.5)
 
         indices = indices[0].tolist()
-        np.testing.assert_equal(indices, [1,2,3])
+        np.testing.assert_equal(indices, [1, 2, 3])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -155,61 +155,11 @@ class TrajectoryEstimator():
     @profile
     def find_smallest_l2_distance_keypoint(self, feature_indices, features, landmark, landmark_desc):
         """Find the keypoint with the smallest l2 distance within the bounding box."""
-
-        # tic_ba = time.time() 
-        # descriptors = features.descriptors[feature_indices]
-        # toc_ba = time.time()
-        # print('1 spents ', toc_ba-tic_ba, 's')
-
-        # tic_ba = time.time() 
-        # features.descriptors[feature_indices]
-        # toc_ba = time.time()
-        # print('1.2 spents ', toc_ba-tic_ba, 's')
-
-
-        # tic_ba = time.time() 
-        # features.descriptors[feature_indices.tolist()]
-        # toc_ba = time.time()
-        # print('1.3 spents ', toc_ba-tic_ba, 's')
-        
-        # tic_ba = time.time() 
-        # dmat = scipy.linalg.blas.dgemm(alpha=1., a=descriptors, b=landmark_desc.reshape(1,256), trans_b=True)
-        # toc_ba = time.time()
-        # print('2 spents ', toc_ba-tic_ba, 's')
-
-        # tic_ba = time.time() 
+        # L2 norm for normalized vectors
         dmat = scipy.linalg.blas.dgemm(alpha=1., a=features.descriptors[feature_indices.tolist()], b=np.array([landmark_desc]), trans_b=True)
-        # toc_ba = time.time()
-        # print('2.2 spents ', toc_ba-tic_ba, 's')
-
-        # tic_ba = time.time() 
-        # a = np.clip(dmat, -1, 1)
-        # toc_ba = time.time()
-        # print('3 spents ', toc_ba-tic_ba, 's')
-
-        # dmat12=dmat
-        # tic_ba = time.time() 
-        # dmat12.clip( -1, 1, out=dmat12)
-        # toc_ba = time.time()
-        # print('3.2 spents ', toc_ba-tic_ba, 's')
-
-        # tic_ba = time.time() 
-        # b = 2-2*a
-        # toc_ba = time.time()
-        # print('4 spents ', toc_ba-tic_ba, 's')
-
-        # tic_ba = time.time() 
-        # c= np.sqrt(b)
-        # toc_ba = time.time()
-        # print('5 spents ', toc_ba-tic_ba, 's')
-
-        # tic_ba = time.time() 
-        # np.sqrt(b, out=b)
-        # toc_ba = time.time()
-        # print('5.2 spents ', toc_ba-tic_ba, 's')
-
         dmat.clip(-1, 1, out = dmat)
         dmat = np.sqrt(2-2*dmat)
+        # find the minimal score
         min_score = np.amin(dmat)
         if min_score < self.l2_threshold:
             feature_index = np.where(dmat == min_score)
@@ -259,7 +209,7 @@ class TrajectoryEstimator():
         return list(filter(None, observations))
 
 
-    def DLT_ransac(self, observations):
+    def pnp_ransac(self, observations):
         """Use 6 points DLT ransac to filter data and generate initial pose estimation.
             Parameters:
                 observations - a list, [(Point2(), Point3())]
