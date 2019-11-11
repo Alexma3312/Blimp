@@ -22,7 +22,10 @@ from sklearn.neighbors import NearestNeighbors
 import math
 from sklearn.metrics import pairwise_distances_argmin_min
 import scipy
-
+from line_profiler import LineProfiler
+import atexit
+profile = LineProfiler()
+atexit.register(profile.print_stats)
 
 
 def X(i):  # pylint: disable=invalid-name
@@ -149,6 +152,7 @@ class TrajectoryEstimator():
             len(dst_keypoints)) if diff[i] < self._diagonal_thresh]
         return nearby_indices
 
+    @profile
     def find_smallest_l2_distance_keypoint(self, feature_indices, features, landmark, landmark_desc):
         """Find the keypoint with the smallest l2 distance within the bounding box."""
 
@@ -213,7 +217,7 @@ class TrajectoryEstimator():
             key_point = features.keypoint(keypoint_index)
             return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
 
-
+    @profile
     def landmark_association(self, superpoint_features, observed_landmarks):
         """ Associate Superpoint feature points with landmark points by matching all superpoint features with projected features.
         Parameters:
@@ -234,33 +238,25 @@ class TrajectoryEstimator():
         # """"
         # Initialize KNN
         # """"
-        samples = superpoint_features.keypoints
         neigh = NearestNeighbors(radius=65.0)
-        neigh.fit(samples, observed_landmarks.keypoints)
-        NearestNeighbors(algorithm='kd_tree', leaf_size=30)
+        neigh.fit(superpoint_features.keypoints, observed_landmarks.keypoints)
+        NearestNeighbors(algorithm='auto', leaf_size=30)
 
-
+        @profile
         def associate_features_to_map_knn(i, projected_point):
             """Associate features to the projected feature points."""
             # Calculate the pixels distances between current superpoint and all the points in the map
-            _, indices = neigh.radius_neighbors(np.array([projected_point]), radius =65)
-
+            _, indices = neigh.radius_neighbors(projected_point.reshape(1,2), radius =65)
             # If no matches, continue
             if indices[0].shape[0] == 0:
                 return False, False
-
             # If there are more than one feature in the bounding box, return the keypoint with the smallest l2 distance
-            keypoint = self.find_smallest_l2_distance_keypoint(indices[0], superpoint_features, observed_landmarks.landmark(i), observed_landmarks.descriptor(i))
-            return keypoint, observed_landmarks.keypoint(i)
-     
+            return self.find_smallest_l2_distance_keypoint(indices[0], superpoint_features, observed_landmarks.landmark(i), observed_landmarks.descriptor(i))
+
         observations = [associate_features_to_map_knn(
             i, projected_point) for i, projected_point in enumerate(observed_landmarks.keypoints)]
 
-        match_keypoints = [observation[1]
-                        for observation in observations if observation[0]]
-        observations = [observation[0]
-                        for observation in observations if observation[0]]
-        return observations, match_keypoints
+        return list(filter(None, observations))
 
 
     def DLT_ransac(self, observations):
@@ -360,8 +356,11 @@ class TrajectoryEstimator():
         # Landmark Association.
         # """
         tic_ba = time.time()
-        observations, keypoints = self.landmark_association(
+        observations = self.landmark_association(
             superpoint_features, observed_landmarks)
+        # lp = LineProfiler()
+        # lp_wrapper = lp(self.landmark_association(superpoint_features, observed_landmarks))
+        # lp.print_stats()
         toc_ba = time.time()
         print('Landmark Association spents ', toc_ba-tic_ba, 's')
         # Check if to see if the associate landmarks is empty.
@@ -369,7 +368,12 @@ class TrajectoryEstimator():
             print("No projected landmarks.")
             return Pose3(), False
         if self._debug:
-            print('Number of Matched Features:{}'.format(len(keypoints)))
+            print('Number of Matched Features:{}'.format(len(observations)))
+            def get_keypoints(observation):
+                landmark = np.array([observation[1].x(),observation[1].y(),observation[1].z()])
+                index = np.where(observed_landmarks.landmarks == landmark)
+                return observed_landmarks.keypoint(int(index[0][0]))
+            keypoints = [get_keypoints(observation) for observation in observations]
             save_match_image(self._directory_name+"match_images/",
                              observations, keypoints, np.copy(color_image), frame_count)
 

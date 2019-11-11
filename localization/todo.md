@@ -5,4 +5,4 @@ https://marcobonzanini.com/2015/01/05/my-python-code-is-slow-tips-for-profiling/
 4. # debug mode to save results
 
 # Still slow
-1. change the save debug -  using the observation landmark instead 
+1. Profilo Analysis the association / Done
