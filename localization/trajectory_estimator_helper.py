@@ -25,7 +25,7 @@ def save_feature_to_file(dir_name, features, index):
     nrpoints = features.get_length()
     descriptor_length = 256
 
-    features = [np.hstack((features.keypoints[i], features.descriptors[i]))
+    features = [np.hstack((features.keypoint(i), features.descriptor(i)))
                 for i in range(nrpoints)]
     features = np.array(features)
 
