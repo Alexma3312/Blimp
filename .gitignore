@@ -1,5 +1,7 @@
 *.jpg
 *.csv
+*.png
+*.g2o
 
 # *.pyc
 # *.bin

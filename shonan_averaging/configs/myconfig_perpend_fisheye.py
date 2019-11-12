@@ -1,33 +1,21 @@
 """Configuration"""
 # pylint: disable=no-member, invalid-name
 import numpy as np
-
-from gtsam import Cal3_S2
+from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
+from gtsam import Cal3_S2, Pose3, Point3, Rot3 # pylint: disable=no-name-in-module
 import cv2
-
-
+from utilities.plotting import plot_poses
+# Steps
 run_undistortion = False
 run_feature_extraction = False
 run_feature_matching = False
 run_bundle_adjustment = True
-save_result = True
+save_result = False
 
-basedir = "shonan_averaging/datasets/klaus_4x3x1/"
+
+basedir = "shonan_averaging/datasets/perpend/"
 image_extension = ".jpg"
 source_image_size = (640, 480)
-
-
-# Create pose estimates
-theta = 45
-delta_x = [0,3.7592,5]
-delta_y = [0,1.75895,1.75895*2,1.75895*3]
-delta_z = 0.9652
-rows = 4
-cols = 3
-angles = 1
-
-prior1_delta = [0, 0, delta_z, 0]
-prior2_delta = [3.7592, 1.75895, delta_z, 0]
 
 
 # Undistortion
@@ -41,11 +29,15 @@ distortion_coefficients = np.array(
 # calibration_matrix = Cal3_S2(fx=232.0542, fy=252.8620, s=0,
 #                              u0=325.3452, v0=240.2912).matrix()
 # Resize
-calibration_matrix = Cal3_S2(fx=211.8927, fy=197.7030, s=0,
-u0=281.1168, v0=179.2954)
-undistort_img_size = (583, 377)
+fx = 199.2197
+fy = 186.9630
+u0 = 334.0790
+v0 = 253.2759
+calibration_matrix = Cal3_S2(fx=fx, fy=fy, s=0,
+                             u0=u0, v0=v0)
+undistort_img_size = (640, 480)
 
-number_images = 14
+number_images = 4
 
 # Feature Type can be:
 #   - 'Superpoint'
@@ -60,27 +52,34 @@ nn_thresh = 0.7
 #  - 'FLANN'
 #  - 'Two Way NN'
 matching_type = "FLANN"
-
 output_prefix = "frame"
 
 # RANSAC parameters
-threshold = 0.1
+threshold = 1
 prob = 0.999
 method = cv2.RANSAC
 
 # Create pose estimates
-theta = 45
-delta_x = [0,3.7592,5]
-delta_y = [0,1.75895,1.75895*2,1.75895*3]
-delta_z = 0.9652
-rows = 4
-cols = 3
-angles = 1
-
-prior1_delta = [0, 0, delta_z, 0]
-prior2_delta = [3.7592, 1.75895, delta_z, 0]
-
+# Camera to world rotation
+wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # pylint: disable=invalid-name
+pose_estimates = pose_estimates = [Pose3(wRc, Point3(0.5*i, 0, 1.5))
+                      for i in range(number_images)]
+plot_poses(pose_estimates,5,5,5,1)
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True
-min_obersvation_number = 6
-backprojection_depth = 15
+min_obersvation_number = 3
+backprojection_depth = 2
+
+
+
+# Image Name: "raw_frame_row_col_angle"
+source_directory = basedir+"source_images"
+
+# Image Name: "frame_id"
+undistort_folder = basedir+"undistort_images"
+
+# 00000id.key
+feature_folder = basedir+"features"
+
+# match_i_j.dat
+match_folder = basedir+"matches"

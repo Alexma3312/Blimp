@@ -78,7 +78,7 @@ class TrajectoryEstimator():
                                 nms_dist=4,
                                 conf_thresh=0.015,
                                 nn_thresh=0.7,
-                                cuda=True)
+                                cuda=False)
         superpoints, descriptors, _ = fe.run(image)
 
         return Features(superpoints[:2, ].T.tolist(), descriptors.T.tolist())
@@ -212,10 +212,10 @@ class TrajectoryEstimator():
             if nearby_indices == []:
                 pass
             # If there are more than one feature in the bounding box, return the keypoint with the smallest l2 distance
-            # tic_ba = time.time()
+            tic_ba = time.time()
             keypoint = self.find_smallest_l2_distance_keypoint(nearby_indices, superpoint_features, observed_landmarks.landmarks[i], observed_landmarks.descriptors[i]), observed_landmarks.keypoints[i]
-            # toc_ba = time.time()
-            # print('Find keypoint spents ', toc_ba-tic_ba, 's')
+            toc_ba = time.time()
+            print('Find keypoint spents ', toc_ba-tic_ba, 's')
             return keypoint
 
 

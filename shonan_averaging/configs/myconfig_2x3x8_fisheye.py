@@ -11,11 +11,12 @@ from utilities.plotting import plot_poses
 # Steps, True or False
 run_undistortion = False
 run_feature_extraction = False
-run_feature_matching = True
-run_bundle_adjustment = False
-save_result = False
+run_feature_matching = False
+run_bundle_adjustment = True
+save_result = True
+run_generate_g2o = True
 
-basedir = "shonan_averaging/datasets/flann_klaus_4x3x8/"
+basedir = "shonan_averaging/datasets/klaus_2x3x8_fisheye_new/"
 image_extension = ".jpg"
 source_image_size = (640, 480)
 
@@ -23,18 +24,20 @@ source_image_size = (640, 480)
 # resize_output = True, output will be resized to the same shape as the input image
 # resize_output = False, output image will shrink due to rectification of radian distort
 resize_output = False
-distort_calibration_matrix = Cal3_S2(
-    fx=347.820593, fy=329.096945, s=0, u0=295.717950, v0=222.964889).matrix()
-distortion_coefficients = np.array(
-    [-0.284322, 0.055723, 0.006772, 0.005264, 0.000000])
-# calibration_matrix = Cal3_S2(fx=232.0542, fy=252.8620, s=0,
-#                              u0=325.3452, v0=240.2912).matrix()
 # Resize
-calibration_matrix = Cal3_S2(fx=211.8927, fy=197.7030, s=0,
-                             u0=281.1168, v0=179.2954)
-undistort_img_size = (583, 377)
+# fx = 333.9190
+# fy = 312.9898
+# u0 = 330.9576
+# v0 = 250.4098
+fx = 199.2197
+fy = 186.9630
+u0 = 334.0790
+v0 = 253.2759
+calibration_matrix = Cal3_S2(fx=fx, fy=fy, s=0,
+                             u0=u0, v0=v0)
+undistort_img_size = (640, 480)
 
-number_images = 96
+number_images = 48
 
 # Feature Type can be:
 #   - 'Superpoint'
@@ -61,12 +64,12 @@ theta = 45
 delta_x = [0, 3.7592, 5]
 delta_y = [0, 1.75895, 1.75895*2, 1.75895*3]
 delta_z = 0.9652
-rows = 4
+rows = 2
 cols = 3
 angles = 8
 
-# pose_estimates = pose_estimate_generator_rectangle_no_prior(
-#     theta, delta_x, delta_y, delta_z, rows, cols, angles)
+pose_estimates = pose_estimate_generator_rectangle_no_prior(
+    theta, delta_x, delta_y, delta_z, rows, cols, angles)
 # plot_poses(pose_estimates, 10, 10, 10, 1)
 # wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
 # shonan_result = read_shonan_result(basedir, 'shonan_result.dat')
@@ -82,8 +85,9 @@ angles = 8
 filter_bad_landmarks_enable = True
 min_obersvation_number = 6
 # There is result when backprojection_depth is 10. But the result is wrong.
-backprojection_depth = 20
-
+backprojection_depth = 10
+# Prior Indices
+prior_indices = (0,8)
 
 # Image Name: "raw_frame_row_col_angle"
 source_directory = basedir+"source_images"

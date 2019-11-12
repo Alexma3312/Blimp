@@ -11,11 +11,12 @@ from utilities.plotting import plot_poses
 # Steps, True or False
 run_undistortion = False
 run_feature_extraction = False
-run_feature_matching = True
-run_bundle_adjustment = False
+run_feature_matching = False
+run_generate_g2o = True
+run_bundle_adjustment = True
 save_result = False
 
-basedir = "shonan_averaging/datasets/flann_klaus_4x3x8/"
+basedir = "shonan_averaging/datasets/klaus_2x3x8/"
 image_extension = ".jpg"
 source_image_size = (640, 480)
 
@@ -27,14 +28,12 @@ distort_calibration_matrix = Cal3_S2(
     fx=347.820593, fy=329.096945, s=0, u0=295.717950, v0=222.964889).matrix()
 distortion_coefficients = np.array(
     [-0.284322, 0.055723, 0.006772, 0.005264, 0.000000])
-# calibration_matrix = Cal3_S2(fx=232.0542, fy=252.8620, s=0,
-#                              u0=325.3452, v0=240.2912).matrix()
 # Resize
 calibration_matrix = Cal3_S2(fx=211.8927, fy=197.7030, s=0,
                              u0=281.1168, v0=179.2954)
 undistort_img_size = (583, 377)
 
-number_images = 96
+number_images = 48
 
 # Feature Type can be:
 #   - 'Superpoint'
@@ -48,41 +47,41 @@ nn_thresh = 0.7
 # Matching Type can be:
 #  - 'FLANN'
 #  - 'Two Way NN'
-matching_type = "FLANN"
+matching_type = 'Select FLANN'
 output_prefix = "frame"
 
 # RANSAC parameters
-threshold = 1
+threshold = 0.1
 prob = 0.999
 method = cv2.RANSAC
 
+# Prior Indices
+prior_indices = (0,24)
 # Create pose estimates
 theta = 45
 delta_x = [0, 3.7592, 5]
 delta_y = [0, 1.75895, 1.75895*2, 1.75895*3]
 delta_z = 0.9652
-rows = 4
+rows = 2
 cols = 3
 angles = 8
 
-# pose_estimates = pose_estimate_generator_rectangle_no_prior(
-#     theta, delta_x, delta_y, delta_z, rows, cols, angles)
-# plot_poses(pose_estimates, 10, 10, 10, 1)
-# wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
-# shonan_result = read_shonan_result(basedir, 'shonan_result.dat')
-# shonan_result_normalize = [np.dot(shonan_result[0].matrix().transpose(
-# ), shonan_result[i].matrix()) for i in range(number_images)]
-# for rot in shonan_result_normalize:
-#     print(np.dot(rot.transpose(), rot))
-# pose_estimates = [Pose3(Rot3(np.dot(wRc.matrix(), shonan_result_normalize[i])), pose_estimates[i].translation())
-#                   for i in range(number_images)]
-# plot_poses(pose_estimates, 10, 10, 10, 1)
+pose_estimates = pose_estimate_generator_rectangle_no_prior(
+    theta, delta_x, delta_y, delta_z, rows, cols, angles)
+plot_poses(pose_estimates, 10, 10, 10, 1)
+wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
+shonan_result = read_shonan_result(basedir, 'shonan_result.dat')
+shonan_result_normalize = [np.dot(shonan_result[0].matrix().transpose(
+), shonan_result[i].matrix()) for i in range(number_images)]
+pose_estimates = [Pose3(Rot3(np.dot(wRc.matrix(), shonan_result_normalize[i])), pose_estimates[i].translation())
+                  for i in range(number_images)]
+plot_poses(pose_estimates, 10, 10, 10, 1)
 
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True
-min_obersvation_number = 6
+min_obersvation_number = 5
 # There is result when backprojection_depth is 10. But the result is wrong.
-backprojection_depth = 20
+backprojection_depth = 15
 
 
 # Image Name: "raw_frame_row_col_angle"

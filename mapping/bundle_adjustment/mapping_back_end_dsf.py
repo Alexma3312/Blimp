@@ -202,8 +202,18 @@ class MappingBackEnd():
             landmark_3d_point = landmark_3d_point/len(observation_list)
             landmark_3d_point = Point3(
                 landmark_3d_point[0, 0], landmark_3d_point[1, 0], landmark_3d_point[2, 0])
+
+            # Check to see if there are points that does not meet cheirality check
+            for observation in observation_list:
+                pose_idx = observation_list[0][0]
+                pose = self._pose_estimates[pose_idx]
+                camera = gtsam.SimpleCamera(pose, self._calibration)
+                pn,flag = camera.projectSafe(landmark_3d_point)
+                if flag == False:
+                    print(pose_idx)
+            
             initial_estimate.insert(P(landmark_idx), landmark_3d_point)
-        # Filter valid poses
+        # Get valid poses
         valid_pose_indices = set()
         for observation_list in self._landmark_map:
             for observation in observation_list:
@@ -214,6 +224,22 @@ class MappingBackEnd():
             initial_estimate.insert(
                 X(pose_idx), self._pose_estimates[pose_idx])
         return initial_estimate
+
+    def cheirality_check(self, initial_estimate, landmark_map):
+        """
+        Check cheirality on all data to reduce the risk of Bundle Adjustment Failure.
+        Parameters:
+            calibration - gtsam.Cal3_S2, camera calibration
+            landmark_map - list, A map of landmarks and their correspondence
+        """
+        # for landmark_idx, observation_list in enumerate(landmark_map):
+        #     # Average initial estimates
+        #     for observation in observation_list:
+        #         key_point = observation_list[0][1]
+        #         pose_idx = observation_list[0][0]
+        #         pose = self._pose_estimates[pose_idx]
+
+        pass
 
     def bundle_adjustment(self):
         """
@@ -262,8 +288,8 @@ class MappingBackEnd():
 
         sfm_result = optimizer.optimize()
         # Check if factor covariances are under constrain
-        marginals = gtsam.Marginals(  # pylint: disable=unused-variable
-            graph, sfm_result)
+        # marginals = gtsam.Marginals(  # pylint: disable=unused-variable
+        #     graph, sfm_result)
         return sfm_result
 
     def get_landmark_descriptor(self, observation_list):

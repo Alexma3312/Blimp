@@ -7,6 +7,7 @@ from calibration.undistort_images.undistort_images import undistort
 from calibration.undistort_images.undistort_images_reserve_source_points import undistort as undistort_shrink
 from superpoint_descriptor.superpoint_wrapper import SuperpointWrapper
 
+
 class FeatureMatcher():
     """Feature Matcher"""
 
@@ -28,10 +29,10 @@ class FeatureMatcher():
             self.source_directory), "Source Directory Dont Exist. Please move all source images into a directory named 'source_images' under the basedir."
         if resize_output is True:
             undistort(self.source_directory, self.image_extension, self.undistort_dir, output_prefix,
-                    distort_calib, distort_coeff)
+                      distort_calib, distort_coeff)
         else:
             undistort_shrink(self.source_directory, self.image_extension, self.undistort_dir, output_prefix,
-                    distort_calib, distort_coeff)
+                             distort_calib, distort_coeff)
 
     def feature_extraction(self, new_image_size, desc_type, nn_thresh=0.7):
         """Extract features."""
@@ -50,11 +51,21 @@ class FeatureMatcher():
         if desc_type == 'Superpoint':
             superpoint_wrapper = SuperpointWrapper(
                 self.basedir, self.image_extension, new_image_size, nn_thresh)
-                        
+
             if matching_type == 'Two Way NN':
                 # Extract and Save feature information into files
-                superpoint_wrapper.get_all_feature_matches(calibration, threshold)
+                # superpoint_wrapper.get_all_feature_matches(calibration, threshold)
+                superpoint_wrapper.get_all_feature_matches(calibration)
 
             if matching_type == 'FLANN':
                 # Extract and Save feature information into files
                 superpoint_wrapper.get_all_feature_matches_FLANN(calibration)
+
+            if matching_type == 'Select FLANN':
+                # Extract and Save feature information into files
+                superpoint_wrapper.get_select_feature_matches_FLANN(
+                    calibration)
+
+            if matching_type == 'FLANN SAVE':
+                # Extract and Save feature information into files
+                superpoint_wrapper.robust_feature_matches(calibration)

@@ -8,16 +8,26 @@ import numpy as np
 from gtsam import Rot3
 
 
-def read_rotation_data(basedir):
+def read_rotation_data(basedir, nmber_images = 100):
     """Read Relative Rotation Data from file."""
     dir_name = basedir+'matches/'
     file_name = dir_name+'rotation.dat'
+
 
     with open(file_name) as file:
         lines = file.readlines()[2:]
     data = [list(map(np.float, match.split())) for match in lines]
     rotation_dict = {(int(match[0]), int(match[1])): np.array(
         match[2:11]).reshape(3, 3) for match in data}
+
+    # Check if all poses are related together
+    check = [False for i in range(nmber_images)]
+    for match in data:
+        check[int(match[0])] = True
+        check[int(match[1])] = True
+    if False in check:
+        print("Poses are not all linked.")
+        print([i for i,item in enumerate(check) if item is False])
 
     return rotation_dict
 

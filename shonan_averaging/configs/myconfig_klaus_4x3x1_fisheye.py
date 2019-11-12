@@ -4,6 +4,7 @@ import numpy as np
 
 from gtsam import Cal3_S2
 import cv2
+from utilities.pose_estimate_generator import pose_estimate_generator_rectangle
 
 
 run_undistortion = False
@@ -11,8 +12,9 @@ run_feature_extraction = False
 run_feature_matching = False
 run_bundle_adjustment = True
 save_result = True
+run_generate_g2o = True
 
-basedir = "shonan_averaging/datasets/klaus_4x3x1/"
+basedir = "shonan_averaging/datasets/klaus_4x3x1_fisheye/"
 image_extension = ".jpg"
 source_image_size = (640, 480)
 
@@ -41,10 +43,13 @@ distortion_coefficients = np.array(
 # calibration_matrix = Cal3_S2(fx=232.0542, fy=252.8620, s=0,
 #                              u0=325.3452, v0=240.2912).matrix()
 # Resize
-calibration_matrix = Cal3_S2(fx=211.8927, fy=197.7030, s=0,
-u0=281.1168, v0=179.2954)
-undistort_img_size = (583, 377)
-
+fx = 333.9190
+fy = 312.9898
+u0 = 330.9576
+v0 = 250.4098
+calibration_matrix = Cal3_S2(fx=fx, fy=fy, s=0,
+                             u0=u0, v0=v0)
+undistort_img_size = (640, 480)
 number_images = 14
 
 # Feature Type can be:
@@ -54,7 +59,8 @@ feature_type = 'Superpoint'
 feature_size = 256
 # Superpoint parameter
 nn_thresh = 0.7
-
+# Prior Indices
+prior_indices = (0,8)
 
 # Matching Type can be:
 #  - 'FLANN'
@@ -79,6 +85,9 @@ angles = 1
 
 prior1_delta = [0, 0, delta_z, 0]
 prior2_delta = [3.7592, 1.75895, delta_z, 0]
+# Create pose estimates
+pose_estimates = pose_estimate_generator_rectangle(
+    theta, delta_x, delta_y, delta_z, prior1_delta, prior2_delta, rows, cols, angles)
 
 # Bundle Adjustment parameters
 filter_bad_landmarks_enable = True
