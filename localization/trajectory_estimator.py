@@ -144,12 +144,10 @@ class TrajectoryEstimator():
 
     def find_keypoints_within_boundingbox(self, src_keypoint, dst_keypoints):
         """Find points within a bounding box around a given keypoint."""
-        dst_keypoints = np.array(dst_keypoints)
         x_diff = dst_keypoints[:, 0] - src_keypoint[0]
         y_diff = dst_keypoints[:, 1] - src_keypoint[1]
         diff = np.multiply(x_diff, x_diff) + np.multiply(y_diff, y_diff)
-        nearby_indices = [i for i in range(
-            len(dst_keypoints)) if diff[i] < self._diagonal_thresh]
+        nearby_indices = [i for i,score in enumerate(diff) if score < self._diagonal_thresh]
         return nearby_indices
 
     @profile
