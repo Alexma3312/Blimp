@@ -8,6 +8,7 @@ measurement_noise = gtsam.noiseModel_Isotropic.Sigma(
 
 # Because the map is known, we use the landmarks from the visible map with nearly zero error as priors.
 point_prior_noise = gtsam.noiseModel_Isotropic.Sigma(3, 0.01)
+noise_models = [measurement_noise, point_prior_noise]
 
 
 # Create calibration matrix

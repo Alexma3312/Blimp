@@ -48,11 +48,10 @@ class TrajectoryEstimator():
         l2 threshold:
         distance thresh:
         debug:
-        measurement noise:
-        point prior noise:
+        noise models:
     """
 
-    def __init__(self, initial_pose, directory_name, camera, l2_threshold, distance_thresh, measurement_noise, point_prior_noise, visualize_enable = True, debug_enable=False):
+    def __init__(self, initial_pose, directory_name, camera, l2_threshold, distance_thresh, noise_models, visualize_enable=True, debug_enable=False):
         self.initial_pose = initial_pose
         self._directory_name = directory_name
 
@@ -62,7 +61,8 @@ class TrajectoryEstimator():
                 print("\nFile name does not exist, the map will be empty.")
                 return LandmarkMap(np.array([]), np.array([]))
             landmark_3d_pts, landmark_desc = load_map_from_file(file_name)
-            input_map = LandmarkMap(np.array(landmark_3d_pts), np.array(landmark_desc))
+            input_map = LandmarkMap(
+                np.array(landmark_3d_pts), np.array(landmark_desc))
             return input_map
         self.map = load_map(directory_name+"/map/map.dat")
         self._camera = camera
@@ -74,8 +74,9 @@ class TrajectoryEstimator():
         self._diagonal_thresh = distance_thresh[0]**2 + distance_thresh[1]**2
         self._visualize = visualize_enable
         self._debug = debug_enable
-        self._measurement_noise = measurement_noise
-        self._point_prior_noise = point_prior_noise
+        self._measurement_noise = noise_models[0]
+        self._point_prior_noise = noise_models[1]
+        self._pose_translation_prior_noise = noise_models[2]
 
     def load_map(self, landmarks):
         """Load map data
@@ -111,7 +112,7 @@ class TrajectoryEstimator():
             pose - gtsam.Point3, the pose of a camera
         Member Dependencies:\n
             map - An ObservedLandmarks Object
-            camera - 
+            camera - An Camera Object
         Returns:\n
             observed landmarks - An ObservedLandmarks Object
         """
@@ -147,25 +148,39 @@ class TrajectoryEstimator():
         x_diff = dst_keypoints[:, 0] - src_keypoint[0]
         y_diff = dst_keypoints[:, 1] - src_keypoint[1]
         diff = np.multiply(x_diff, x_diff) + np.multiply(y_diff, y_diff)
-        nearby_indices = [i for i,score in enumerate(diff) if score < self._diagonal_thresh]
+        nearby_indices = [i for i, score in enumerate(
+            diff) if score < self._diagonal_thresh]
         return nearby_indices
 
-    @profile
+    # @profile
     def find_smallest_l2_distance_keypoint(self, feature_indices, features, landmark, landmark_desc):
-        """Find the keypoint with the smallest l2 distance within the bounding box."""
+        """Find the keypoint with the smallest l2 distance within the bounding box.
+        Member Variables:
+            l2 threshold: l2 norm threshold
+        Parameters:
+            feature_indices: array
+            features: a Features object
+            landmark: (2,) array
+            landmark_desc: (256,) array
+        Returns:
+            Point2, Point3
+        """
         # L2 norm for normalized vectors
-        dmat = scipy.linalg.blas.dgemm(alpha=1., a=features.descriptors[feature_indices.tolist()], b=np.array([landmark_desc]), trans_b=True)
-        dmat.clip(-1, 1, out = dmat)
+        dmat = scipy.linalg.blas.dgemm(alpha=1., a=features.descriptors[feature_indices.tolist(
+        )], b=np.array([landmark_desc]), trans_b=True)
+        # dmat = np.dot(features.descriptors, landmark_desc)
+        dmat.clip(-1, 1, out=dmat)
         dmat = np.sqrt(2-2*dmat)
         # find the minimal score
+        # TODO:shicong, add a ratio test to filter bad points
         min_score = np.amin(dmat)
         if min_score < self.l2_threshold:
             feature_index = np.where(dmat == min_score)
-            keypoint_index = feature_indices[int(feature_index[0])]
+            keypoint_index = feature_indices[int(feature_index[0][0])]
             key_point = features.keypoint(keypoint_index)
             return Point2(key_point[0], key_point[1]), Point3(landmark[0], landmark[1], landmark[2])
 
-    @profile
+    # @profile
     def landmark_association(self, superpoint_features, observed_landmarks):
         """ Associate Superpoint feature points with landmark points by matching all superpoint features with projected features.
         Parameters:
@@ -181,20 +196,20 @@ class TrajectoryEstimator():
         # If the map contains less noise and more structure, which means if we trust the map.
         # Then we map the extracted feature to the observed landmarks.
         # """"
-        
 
         # """"
         # Initialize KNN
         # """"
-        neigh = NearestNeighbors(radius=65.0)
+        neigh = NearestNeighbors(radius=self.x_distance_thresh)
         neigh.fit(superpoint_features.keypoints, observed_landmarks.keypoints)
         NearestNeighbors(algorithm='auto', leaf_size=30)
 
-        @profile
+        # @profile
         def associate_features_to_map_knn(i, projected_point):
             """Associate features to the projected feature points."""
             # Calculate the pixels distances between current superpoint and all the points in the map
-            _, indices = neigh.radius_neighbors(projected_point.reshape(1,2), radius =65)
+            indices = neigh.radius_neighbors(
+                projected_point.reshape(1, 2), radius=self.x_distance_thresh, return_distance=False)
             # If no matches, continue
             if indices[0].shape[0] == 0:
                 return False, False
@@ -205,7 +220,6 @@ class TrajectoryEstimator():
             i, projected_point) for i, projected_point in enumerate(observed_landmarks.keypoints)]
 
         return list(filter(None, observations))
-
 
     def pnp_ransac(self, observations):
         """Use 6 points DLT ransac to filter data and generate initial pose estimation.
@@ -222,7 +236,7 @@ class TrajectoryEstimator():
         # Use the new estimate pose to back project the observed 3D points to select for outlier
         pass
 
-    def BA_pose_estimation(self, observations, estimated_pose):
+    def BA_pose_estimation(self, observations, previous_pose,estimated_pose= Pose3()):
         """ Estimate current pose with matched features through GTSAM Bundle Adjustment.
         Parameters:
             observations - [[Point2(), Point3()]]
@@ -246,7 +260,10 @@ class TrajectoryEstimator():
                 P(i), observation[1], self._point_prior_noise))
             initial_estimate.insert(P(i), observation[1])
         # Create initial estimate for the pose
-        initial_estimate.insert(X(0), estimated_pose)
+        initial_estimate.insert(X(0), previous_pose)
+        # TODO: Shicong, Add a prior factor by using the previous pose
+        graph.add(gtsam.PoseTranslationPrior(
+                X(0), previous_pose, self._pose_translation_prior_noise))
 
         # Optimization
         optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
@@ -306,9 +323,6 @@ class TrajectoryEstimator():
         tic_ba = time.time()
         observations = self.landmark_association(
             superpoint_features, observed_landmarks)
-        # lp = LineProfiler()
-        # lp_wrapper = lp(self.landmark_association(superpoint_features, observed_landmarks))
-        # lp.print_stats()
         toc_ba = time.time()
         print('Landmark Association spents ', toc_ba-tic_ba, 's')
         # Check if to see if the associate landmarks is empty.
@@ -317,17 +331,20 @@ class TrajectoryEstimator():
             return Pose3(), False
         if self._debug:
             print('Number of Matched Features:{}'.format(len(observations)))
+
             def get_keypoints(observation):
-                landmark = np.array([observation[1].x(),observation[1].y(),observation[1].z()])
+                landmark = np.array(
+                    [observation[1].x(), observation[1].y(), observation[1].z()])
                 index = np.where(observed_landmarks.landmarks == landmark)
                 return observed_landmarks.keypoint(int(index[0][0]))
-            keypoints = [get_keypoints(observation) for observation in observations]
+            keypoints = [get_keypoints(observation)
+                         for observation in observations]
             save_match_image(self._directory_name+"match_images/",
                              observations, keypoints, np.copy(color_image), frame_count)
 
-        # If number of observations<6 pass
-        if len(observations) < 6:
-            print("Number of Observations less than 6.")
+        # If number of observations less than 12 pass
+        if len(observations) < 12:
+            print("Number of Observations less than 12.")
             return Pose3(), False
 
         # """
@@ -392,9 +409,10 @@ class TrajectoryEstimator():
                 continue
 
             # If current pose too different from previous pose, use the previous pose
-            distance = np.linalg.norm(current_pose.translation().vector() - pre_pose.translation().vector())
-            if distance > 1:
-                 current_pose = pre_pose
+            # distance = np.linalg.norm(current_pose.translation(
+            # ).vector() - pre_pose.translation().vector())
+            # if distance > 1:
+            #     current_pose = pre_pose
             trajectory.append(current_pose)
 
             if self._visualize is True:

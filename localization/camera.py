@@ -7,6 +7,14 @@ import numpy as np
 
 class Camera():
     def __init__(self, fx, fy, u0, v0, image_size):
+        """
+        Parameters:
+            image size: (width,height) to follow cv
+        Member Variables:
+            distort_enable: if distort enable is False, the camera calibration matrix will be a simple pinhole camera calibration matrix
+            calibration: Cal3S2
+            image size:(height, width) to follow numpy
+        """
         self.distort_enable = False
         self.calibration = Cal3_S2(fx=fx, fy=fy, s=0, u0=u0, v0=v0)
         self.image_size = (image_size[1], image_size[0])
