@@ -3,12 +3,13 @@ from localization.camera import Camera
 
 
 measurement_noise_sigma = 1.0
-measurement_noise = gtsam.noiseModel_Isotropic.Sigma(
-    2, measurement_noise_sigma)
+measurement_noise = gtsam.noiseModel_Robust(gtsam.noiseModel_mEstimator_Huber(
+            1.345), gtsam.noiseModel_Isotropic.Sigma(2, measurement_noise_sigma))
 
 # Because the map is known, we use the landmarks from the visible map with nearly zero error as priors.
-point_prior_noise = gtsam.noiseModel_Isotropic.Sigma(3, 0.01)
-noise_models = [measurement_noise, point_prior_noise]
+point_prior_noise = gtsam.noiseModel_Isotropic.Sigma(3, 0.001)
+pose_translation_prior_noise = gtsam.noiseModel_Isotropic.Sigma(3, 0.1)
+noise_models = [measurement_noise, point_prior_noise,pose_translation_prior_noise]
 
 
 # Create calibration matrix

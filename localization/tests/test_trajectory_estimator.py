@@ -119,63 +119,127 @@ class TestTrajectoryEstimator(GtsamTestCase):
         self.gtsamAssertEquals(expected_point2, observation[0])
         self.gtsamAssertEquals(expected_point3, observation[1])
 
-
     @unittest.skip("test_landmark_association")
     def test_landmark_association(self):
         # Create observed landmarks
-        obersved_keypoints = np.array([[10,10],[100,10],[500,50]])
+        obersved_keypoints = np.array([[10, 10], [100, 10], [500, 50]])
         obersved_descriptors = np.zeros((3, 256))
-        obersved_descriptors[:3,0] = 1
-        obersved_landmarks = np.arange(9).reshape(3,3)
+        obersved_descriptors[:3, 0] = 1
+        obersved_landmarks = np.arange(9).reshape(3, 3)
         observed_landmarks = ObservedLandmarks()
         observed_landmarks.landmarks = obersved_landmarks
         observed_landmarks.descriptors = obersved_descriptors
         observed_landmarks.keypoints = obersved_keypoints
         # Create Superpoint Features
-        superpoint_keypoints = np.array([[12,14], [30,30],[100,200],[400,200],[100,70]])
+        superpoint_keypoints = np.array(
+            [[12, 14], [30, 30], [100, 200], [400, 200], [100, 70]])
         superpoint_descriptors = np.zeros((5, 256))
         superpoint_descriptors[0][1] = 1
         superpoint_descriptors[1][0] = 0.9
-        superpoint_descriptors[2:4,0] = 1
+        superpoint_descriptors[2:4, 0] = 1
         superpoint_descriptors[4][0] = 0.9
-        superpoint_features = Features(superpoint_keypoints, superpoint_descriptors)
+        superpoint_features = Features(
+            superpoint_keypoints, superpoint_descriptors)
 
         trajectory_estimator.x_distance_thresh = 65
         trajectory_estimator.l2_threshold = 0.6
         # Create expected observations
-        expected_observations = [(Point2(30,30), Point3(0,1,2)),(Point2(100,70), Point3(3,4,5))]
+        expected_observations = [(Point2(30, 30), Point3(
+            0, 1, 2)), (Point2(100, 70), Point3(3, 4, 5))]
 
-        
-        actual_observations = trajectory_estimator.landmark_association(superpoint_features, observed_landmarks)
-        self.gtsamAssertEquals(actual_observations[0][0], expected_observations[0][0])
-        self.gtsamAssertEquals(actual_observations[0][1], expected_observations[0][1])
-        self.gtsamAssertEquals(actual_observations[1][0], expected_observations[1][0])
-        self.gtsamAssertEquals(actual_observations[1][1], expected_observations[1][1])
-        
+        actual_observations = trajectory_estimator.landmark_association(
+            superpoint_features, observed_landmarks)
+        self.gtsamAssertEquals(
+            actual_observations[0][0], expected_observations[0][0])
+        self.gtsamAssertEquals(
+            actual_observations[0][1], expected_observations[0][1])
+        self.gtsamAssertEquals(
+            actual_observations[1][0], expected_observations[1][0])
+        self.gtsamAssertEquals(
+            actual_observations[1][1], expected_observations[1][1])
 
-    @unittest.skip("test_pnp_ransac")
+    def test_cv2_pnp_ransac(self):
+        # Create 6 points associations
+        wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)
+        pose = Pose3(wRc, Point3(0.5, 0.2, 1))
+        fx = 200
+        fy = 200
+        u0 = 320
+        v0 = 240
+        #  width,height
+        K = Cal3_S2(fx, fy, 0, u0, v0)
+        simple_camera = gtsam.SimpleCamera(pose, K)
+        point3d_0 = Point3(5, 5, 1)
+        point2d_0 = simple_camera.project(point3d_0)
+        point3d_1 = Point3(7, 8, 2)
+        point2d_1 = simple_camera.project(point3d_1)
+        point3d_2 = Point3(11, 2, 4)
+        point2d_2 = simple_camera.project(point3d_2)
+        point3d_3 = Point3(17, 15, 13)
+        point2d_3 = simple_camera.project(point3d_3)
+        point3d_4 = Point3(4, 3, 6)
+        point2d_4 = simple_camera.project(point3d_4)
+        point3d_5 = Point3(3, 7, 12)
+        point2d_5 = simple_camera.project(point3d_5)
+        observations = [(point2d_0, point3d_0),
+                        (point2d_1, point3d_1),
+                        (point2d_2, point3d_2),
+                        (point2d_3, point3d_3),
+                        (point2d_4, point3d_4),
+                        (point2d_5, point3d_5)]
+        image_points = np.empty((2,))
+        object_points = np.empty((3,))
+        for observation in observations:
+            image_points = np.vstack(
+                (image_points, [observation[0].x(), observation[0].y()]))
+            object_points = np.vstack(
+                (object_points, [observation[1].x(), observation[1].y(), observation[1].z()]))
+
+        #https://stackoverflow.com/questions/35650105/what-are-python-constants-for-cv2-solvepnp-method-flag
+        retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
+            object_points, image_points, K.matrix(), None, None, None, False, cv2.SOLVEPNP_DLS)
+        rotation, _ = cv2.Rodrigues(rvecs)
+
+        # R.T
+        np.testing.assert_almost_equal(rotation, wRc.matrix().T, decimal=4)
+        np.testing.assert_almost_equal(rotation.T, wRc.matrix(), decimal=4)
+        # -R.T*t
+        np.testing.assert_almost_equal(
+            tvecs, -np.dot(wRc.matrix().T, np.array([[0.5], [0.2], [1]])), decimal=4)
+        np.testing.assert_almost_equal(
+            np.dot(rotation.T,-tvecs), np.array([[0.5], [0.2], [1]]), decimal=4)
+
+    # @unittest.skip("test_pnp_ransac")
+
     def test_pnp_ransac(self):
-        # observations - a list, [(Point2(), Point3())]
-        object_points = np.array([])
-        image_points = np.array([])
 
-        # 12 set of points
-        point_2d_1 = [2, 1]
-        point_3d_1 = [10, 10, 10]
+        # Create 12 points associations
 
-        # 6 set of points
-        # 5 set of points
+        # Create 12 points with noise
 
-        expected_pose = np.array([])
+        # Create 18 points with mismatches
 
-        # initial_estimation
-        useExtrinsicGuess = None
+        # # observations - a list, [(Point2(), Point3())]
+        # object_points = np.array([])
+        # image_points = np.array([])
 
-        # method - CV_EPNP
-        # flags = cv2.CV_EPNP
+        # # 12 set of points
+        # point_2d_1 = [2, 1]
+        # point_3d_1 = [10, 10, 10]
 
-        # Flag method for solving a PnP problem
-        rvec, tvec, actual_inlier = trajectory_estimator.pnp_ransac()
+        # # 6 set of points
+        # # 5 set of points
+
+        # expected_pose = np.array([])
+
+        # # initial_estimation
+        # useExtrinsicGuess = None
+
+        # # method - CV_EPNP
+        # # flags = cv2.CV_EPNP
+
+        # # Flag method for solving a PnP problem
+        # rvec, tvec, actual_inlier = trajectory_estimator.pnp_ransac()
 
         pass
 

@@ -9,7 +9,7 @@ import numpy as np
 
 import gtsam
 from mapping.bundle_adjustment.mapping_result_helper import load_map_from_file
-from gtsam import Point2, Point3, symbol, Pose3
+from gtsam import Point2, Point3, symbol, Pose3, Rot3
 from localization.features import Features
 from localization.observed_landmarks import ObservedLandmarks
 from localization.landmark_map import LandmarkMap
@@ -212,7 +212,7 @@ class TrajectoryEstimator():
                 projected_point.reshape(1, 2), radius=self.x_distance_thresh, return_distance=False)
             # If no matches, continue
             if indices[0].shape[0] == 0:
-                return False, False
+                return None
             # If there are more than one feature in the bounding box, return the keypoint with the smallest l2 distance
             return self.find_smallest_l2_distance_keypoint(indices[0], superpoint_features, observed_landmarks.landmark(i), observed_landmarks.descriptor(i))
 
@@ -224,19 +224,35 @@ class TrajectoryEstimator():
     def pnp_ransac(self, observations):
         """Use 6 points DLT ransac to filter data and generate initial pose estimation.
             Parameters:
-                observations - a list, [(Point2(), Point3())]
+                observations - a list, [[Point2(), Point3()]]
             Return:
                 pose - Pose3
                 new_observations - a list, [(Point2(), Point3())]
         """
         # Use opencv to solve PnP ransac
         # https://www.learnopencv.com/head-pose-estimation-using-opencv-and-dlib/
+        image_points = np.empty((2,))
+        object_points = np.empty((3,))
+        for observation in observations:
+            image_points = np.vstack(
+                (image_points, [observation[0].x(), observation[0].y()]))
+            object_points = np.vstack(
+                (object_points, [observation[1].x(), observation[1].y(), observation[1].z()]))
 
-        # new estimate pose  = cv2.solvePnPRansac
-        # Use the new estimate pose to back project the observed 3D points to select for outlier
-        pass
+        #https://stackoverflow.com/questions/35650105/what-are-python-constants-for-cv2-solvepnp-method-flag
+        retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
+            object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_P3P)
+        rotation, _ = cv2.Rodrigues(rvecs)
+        rotation = rotation.T
+        translation = np.dot(rotation.T, -tvecs)
 
-    def BA_pose_estimation(self, observations, previous_pose,estimated_pose= Pose3()):
+        if inliers is None or inliers.shape[0]<0.5*len(observations):
+            return [], None, None
+
+        # Filter observations
+        return [observations[int(index)-1] for index in inliers], rotation, translation
+
+    def BA_pose_estimation(self, observations, previous_pose):
         """ Estimate current pose with matched features through GTSAM Bundle Adjustment.
         Parameters:
             observations - [[Point2(), Point3()]]
@@ -244,6 +260,7 @@ class TrajectoryEstimator():
         Returns:
             current_pose - gtsam.pose3 Object. The current calculated pose.
         """
+        # observations, R, t = self.pnp_ransac(observations)
         # Need to consider the situation when the number of observation is not enough.
         assert observations, "The observation is empty."
 
@@ -260,9 +277,11 @@ class TrajectoryEstimator():
                 P(i), observation[1], self._point_prior_noise))
             initial_estimate.insert(P(i), observation[1])
         # Create initial estimate for the pose
-        initial_estimate.insert(X(0), previous_pose)
+        # initial_estimate.insert(X(0), Pose3(
+        #     Rot3(R.reshape(3, 3)), Point3(t.reshape(3,))))
+        initial_estimate.insert(X(0),previous_pose)
         # TODO: Shicong, Add a prior factor by using the previous pose
-        graph.add(gtsam.PoseTranslationPrior(
+        graph.add(gtsam.PoseTranslationPrior3D(
                 X(0), previous_pose, self._pose_translation_prior_noise))
 
         # Optimization
@@ -352,6 +371,11 @@ class TrajectoryEstimator():
         # """
         # TODO:estimated_pose, new_observations = self.DLT_ransac(observations)
         # TODO:Check estimated_pose and prepose
+        observations, R, t = self.pnp_ransac(observations)
+
+        if len(observations) < 6:
+            print("Number of Observations less than 6.")
+            return Pose3(), False
 
         # """
         # Bundle Adjustment.
