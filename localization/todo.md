@@ -6,3 +6,8 @@
 
 # Still slow
 1. Profilo Analysis the association / Done
+
+1. mapping
+2. pnp
+3. computation time - 0.4
+4. prior factor

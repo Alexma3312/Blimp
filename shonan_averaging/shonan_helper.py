@@ -49,7 +49,7 @@ def generate_rotation_edge(rotation_dict, pose_estimates):
         edge = np.append(pose_estimates[idx2].translation().vector(
         )-pose_estimates[idx1].translation().vector(), quat)
         edge = np.append(edge, np.array(
-            [100, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 100, 0, 0, 0, 100, 0, 0, 100, 0, 100]))
+            [100, 0, 0, 0, 0, 0, 100, 0, 0, 0, 0, 100, 0, 0, 0, 25, 0, 0, 25, 0, 25]))
         edges[(idx1, idx2)] = edge
     return edges
 

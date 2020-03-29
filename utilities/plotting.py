@@ -214,7 +214,7 @@ def plot_trajectory(trajectory, figure_number=0, x_axe=5, y_axe=5, z_axe=5, axis
     # plt.show()
 
 
-def plot_trajectory_verification(landmarks, poses, trajectory, x_axe=30, y_axe=30, z_axe=30, axis_length=2, figure_number=0):
+def plot_trajectory_verification(landmarks, poses, trajectory=[], x_axe=30, y_axe=30, z_axe=30, axis_length=2, figure_number=0):
     """Plot the map, mapping pose results, and the generated trajectory.
     Parameters:
         landmarks - a list of [x,y,z]

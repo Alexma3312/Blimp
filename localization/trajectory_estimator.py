@@ -100,7 +100,7 @@ class TrajectoryEstimator():
                                 nms_dist=4,
                                 conf_thresh=0.015,
                                 nn_thresh=0.7,
-                                cuda=False)
+                                cuda=True)
         superpoints, descriptors, _ = fe.run(image)
 
         return Features(superpoints[:2, ].T, descriptors.T)
@@ -119,12 +119,14 @@ class TrajectoryEstimator():
         # Check if the atrium map is empty
         assert self.map.get_length(), "The map is empty."
 
-        if not self._camera.distort_enable:
-            height, width = self._camera.image_size
-            calibration = self._camera.calibration
-        else:
-            height, width = self._camera.undistort_image_size
-            calibration = self._camera.undistort_calibration
+        height, width = self._camera.image_size
+        calibration = self._camera.calibration
+        # if not self._camera.distort_enable:
+        #     height, width = self._camera.image_size
+        #     calibration = self._camera.calibration
+        # else:
+        #     height, width = self._camera.undistort_image_size
+            # calibration = self._camera.undistort_calibration
 
         observed_landmarks = ObservedLandmarks()
         for i, landmark_point in enumerate(self.map.landmarks):
@@ -241,14 +243,13 @@ class TrajectoryEstimator():
 
         #https://stackoverflow.com/questions/35650105/what-are-python-constants-for-cv2-solvepnp-method-flag
         retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
-            object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_P3P)
+            object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_DLS)
         rotation, _ = cv2.Rodrigues(rvecs)
         rotation = rotation.T
-        translation = np.dot(rotation.T, -tvecs)
+        translation = -np.dot(rotation.T, tvecs)
 
         if inliers is None or inliers.shape[0]<0.5*len(observations):
             return [], None, None
-
         # Filter observations
         return [observations[int(index)-1] for index in inliers], rotation, translation
 
@@ -285,7 +286,10 @@ class TrajectoryEstimator():
                 X(0), previous_pose, self._pose_translation_prior_noise))
 
         # Optimization
-        optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
+        # optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
+        params = gtsam.GaussNewtonParams()
+        params.setLinearSolverType("MULTIFRONTAL_QR")
+        optimizer = gtsam.GaussNewtonOptimizer(graph, initial_estimate, params)
         result = optimizer.optimize()
         current_pose = result.atPose3(X(0))
         return current_pose
@@ -372,6 +376,19 @@ class TrajectoryEstimator():
         # TODO:estimated_pose, new_observations = self.DLT_ransac(observations)
         # TODO:Check estimated_pose and prepose
         observations, R, t = self.pnp_ransac(observations)
+        # Check if to see if the associate landmarks is empty.
+        if self._debug:
+            print('Number of Filter Matched Features:{}'.format(len(observations)))
+
+            def get_keypoints(observation):
+                landmark = np.array(
+                    [observation[1].x(), observation[1].y(), observation[1].z()])
+                index = np.where(observed_landmarks.landmarks == landmark)
+                return observed_landmarks.keypoint(int(index[0][0]))
+            keypoints = [get_keypoints(observation)
+                         for observation in observations]
+            save_match_image(self._directory_name+"filter_match_images/",
+                             observations, keypoints, np.copy(color_image), frame_count)
 
         if len(observations) < 6:
             print("Number of Observations less than 6.")
@@ -384,6 +401,19 @@ class TrajectoryEstimator():
         current_pose = self.BA_pose_estimation(observations, pre_pose)
         toc_ba = time.time()
         print('BA spents ', toc_ba-tic_ba, 's')
+
+        if self._debug:
+            print('Number of Matched Features:{}'.format(len(observations)))
+            observed_landmarks = self.landmark_projection(current_pose)
+            def get_keypoints(observation):
+                landmark = np.array(
+                    [observation[1].x(), observation[1].y(), observation[1].z()])
+                index = np.where(observed_landmarks.landmarks == landmark)
+                return observed_landmarks.keypoint(int(index[0][0]))
+            keypoints = [get_keypoints(observation)
+                         for observation in observations]
+            save_match_image(self._directory_name+"final_project_images/",
+                             observations, keypoints, np.copy(color_image), frame_count)
 
         return current_pose, True
 
@@ -412,7 +442,7 @@ class TrajectoryEstimator():
         ax1 = fig.add_subplot(1, 2, 1, projection='3d')
         ax2 = fig.add_subplot(1, 2, 2)
         # plot_map_ax(self.map.landmarks, ax1)
-        # plt.show(block=False)
+        plt.show(block=False)
 
         # Help to index the input image
         frame_count = 0
@@ -440,8 +470,8 @@ class TrajectoryEstimator():
             trajectory.append(current_pose)
 
             if self._visualize is True:
-                ax2.imshow(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
-                plot_trajectory_ax(trajectory, ax1)
+                # ax2.imshow(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
+                plot_trajectory_ax(trajectory[-5:], ax1)
 
                 plt.show(block=False)
 

@@ -39,8 +39,8 @@ def undistort(basedir, img_extension, output_dir, output_prefix, calibration, di
         dst = cv2.remap(img, mapx, mapy, cv2.INTER_LINEAR)
 
         # crop the image
-        x, y, w, h = roi
-        dst = dst[y:y+h, x:x+w]
+        # x, y, w, h = roi
+        # dst = dst[y:y+h, x:x+w]
 
         output_path = output_dir+output_prefix+'_%d' % img_idx+img_extension
         print(output_path)
