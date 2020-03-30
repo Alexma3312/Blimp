@@ -41,29 +41,29 @@ class VideoStreamer():
             self.camera = True
         else:
             # Try to open as a video.
-            self.cap = cv2.VideoCapture(basedir)
-            lastbit = basedir[-4:len(basedir)]
-            if (type(self.cap) == list or not self.cap.isOpened()) and (lastbit == '.mp4'):
-                raise IOError('Cannot open movie file')
-            elif type(self.cap) != list and self.cap.isOpened() and (lastbit != '.txt'):
-                print('==> Processing Video Input.')
-                num_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
-                self.listing = range(0, num_frames)
-                self.listing = self.listing[::self.skip]
-                self.camera = True
-                self.video_file = True
-                self.maxlen = len(self.listing)
-            else:
-                print('==> Processing Image Directory Input.')
-                search = os.path.join(basedir, img_glob)
-                self.listing = glob.glob(search)
-                # self.listing.sort()
-                self.listing.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
-                self.listing = self.listing[::self.skip]
-                self.maxlen = len(self.listing)
-                if self.maxlen == 0:
-                    raise IOError(
-                        'No images were found (maybe bad \'--img_glob\' parameter?)')
+            # self.cap = cv2.VideoCapture(basedir)
+            # lastbit = basedir[-4:len(basedir)]
+            # if (type(self.cap) == list or not self.cap.isOpened()) and (lastbit == '.mp4'):
+            #     raise IOError('Cannot open movie file')
+            # elif type(self.cap) != list and self.cap.isOpened() and (lastbit != '.txt'):
+            #     print('==> Processing Video Input.')
+            #     num_frames = int(self.cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            #     self.listing = range(0, num_frames)
+            #     self.listing = self.listing[::self.skip]
+            #     self.camera = True
+            #     self.video_file = True
+            #     self.maxlen = len(self.listing)
+            # else:
+            print('==> Processing Image Directory Input.')
+            search = os.path.join(basedir, img_glob)
+            self.listing = glob.glob(search)
+            # self.listing.sort()
+            self.listing.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
+            self.listing = self.listing[::self.skip]
+            self.maxlen = len(self.listing)
+            if self.maxlen == 0:
+                raise IOError(
+                    'No images were found (maybe bad \'--img_glob\' parameter?)')
 
     def read_image(self, impath, img_size):
         """ Read image as grayscale and resize to img_size.
@@ -114,8 +114,19 @@ class VideoStreamer():
             self.skip += self.skip
         else:
             image_file = self.listing[self.i]
-            input_image = self.read_image(image_file, self.sizer)
-            color_image = cv2.imread(image_file)
+            color_image = cv2.imread(image_file, 1)
+            if color_image is None:
+                raise Exception('Error reading image %s' % image_file)
+            # Image is resized via opencv.
+            interp = cv2.INTER_AREA
+            color_image = cv2.resize(
+                color_image, (self.sizer[1], self.sizer[0]), interpolation=interp)
+            
+            input_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2GRAY)
+            input_image = (input_image.astype('float32') / 255.)
+
+            # input_image = self.read_image(image_file, self.sizer)
+            # color_image = cv2.imread(image_file)
         # Increment internal counter.
         self.i = self.i + 1
         input_image = input_image.astype('float32')
