@@ -16,17 +16,14 @@ from mapping.bundle_adjustment.mapping_result_helper import load_poses_from_file
 
 def run():
     """Execution."""
-    # Camera to world rotation
-    # wRc = Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0)  # pylint: disable=invalid-name
-    # initial_pose = Pose3(wRc, Point3(0, 0, 1.5))
-    directory_name = "/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_96/"
+    directory_name = "/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_972/"
     poses = load_poses_from_file(directory_name+'map/poses.dat')
     initial_pose = poses[42]
     rotation = Rot3(np.array(initial_pose[3:]).reshape(3, 3))
     initial_pose = Pose3(rotation, Point3(np.array(initial_pose[0:3])))
 
     l2_thresh = 0.6
-    distance_thresh = [50, 50]
+    distance_thresh = [30, 30]
     trajectory_estimator = TrajectoryEstimator(
         initial_pose, directory_name, camera, l2_thresh, distance_thresh, noise_models, True, True)
 

@@ -13,7 +13,7 @@ noise_models = [measurement_noise, point_prior_noise,pose_translation_prior_nois
 
 
 # Create calibration matrix
-downsample_scale = 4
+downsample_scale = 1
 fx = 501.582483/downsample_scale
 fy = 505.573729/downsample_scale
 u0 = 312.511059/downsample_scale
