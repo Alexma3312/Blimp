@@ -1,7 +1,8 @@
 """Helper functions for trajectory estimator."""
-import numpy as np
 import os
+
 import cv2
+import numpy as np
 
 # Font parameters for visualizaton.
 FONT = cv2.FONT_HERSHEY_DUPLEX
@@ -69,7 +70,7 @@ def save_match_image(dir_name, observations, keypoints, color_image, index):
         cv2.circle(color_image, pt2, 2, (255, 0, 0), -1, lineType=16)
         cv2.line(color_image, pt1, pt2, (0, 0, 0), 1)
     cv2.putText(color_image, 'Green is extract features and Red is project features.',
-                    FONT_PT, FONT, FONT_SC, FONT_CLR, lineType=16)
+                FONT_PT, FONT, FONT_SC, FONT_CLR, lineType=16)
 
     if not os.path.exists(dir_name):
         os.mkdir(dir_name)
