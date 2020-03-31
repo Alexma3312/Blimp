@@ -298,6 +298,8 @@ class TrajectoryEstimator():
         #############################################################################
         # if self._debug and not os.path.exists(self._directory_name+"debug/"):
         #     os.mkdir(self._directory_name+"debug/")
+        table = [frame_count]
+        total_time = 0.0
         
         #############################################################################
         # 1 Image undistort.
@@ -306,11 +308,13 @@ class TrajectoryEstimator():
         image = cv2.undistort(image, self._camera.calibration.matrix(), self._camera.distortion)
         toc_ba = time.time()
         print('Undistort spents ', toc_ba-tic_ba, 's')
-        # if self._debug:
+        if self._debug:
         #     if not os.path.exists(self._directory_name+"debug/undistort_images/"):
         #         os.mkdir(self._directory_name+"debug/undistort_images/")
         #     output_path = self._directory_name+'debug/undistort_images/frame_%d' % frame_count+'.jpg'
         #     cv2.imwrite(output_path, image*255)
+            table.append(toc_ba-tic_ba)
+            total_time+=toc_ba-tic_ba
 
         #############################################################################
         # 2 Superpoint Feature Extraction.
@@ -330,6 +334,9 @@ class TrajectoryEstimator():
             #                      "debug/features/", superpoint_features, frame_count)
             # save_feature_image(self._directory_name+"debug/feature_images/",
             #                    superpoint_features, np.copy(color_image), frame_count)
+            table.append(toc_ba-tic_ba)
+            table.append(superpoint_features.get_length())
+            total_time+=toc_ba-tic_ba
 
         #############################################################################
         # 3 Landmark Backprojection.
@@ -349,6 +356,9 @@ class TrajectoryEstimator():
             #     self._directory_name+"debug/project_features/", observed_landmarks, frame_count)
             # save_feature_image(self._directory_name+"debug/project_feature_images/",
             #                    observed_landmarks, np.copy(color_image), frame_count, color=(255, 0, 0))
+            table.append(toc_ba-tic_ba)
+            table.append(observed_landmarks.get_length())
+            total_time+=toc_ba-tic_ba
 
         #############################################################################
         # 4 Landmark Association.
@@ -374,6 +384,9 @@ class TrajectoryEstimator():
                          for observation in observations]
             save_match_image(self._directory_name+"debug/match_images/",
                              observations, keypoints, np.copy(color_image), frame_count)
+            table.append(toc_ba-tic_ba)
+            table.append(len(observations))
+            total_time+=toc_ba-tic_ba
 
         # If number of observations less than 12 pass
         if len(observations) < 12:
@@ -401,6 +414,9 @@ class TrajectoryEstimator():
                          for observation in observations]
             save_match_image(self._directory_name+"debug/filter_match_images/",
                              observations, keypoints, np.copy(color_image), frame_count)
+            table.append(toc_ba-tic_ba)
+            table.append(len(observations))
+            total_time+=toc_ba-tic_ba
 
         if len(observations) < 6:
             print("Number of Observations less than 6.")
@@ -427,6 +443,16 @@ class TrajectoryEstimator():
                          for observation in observations]
             save_match_image(self._directory_name+"debug/final_project_images/",
                              observations, keypoints, np.copy(color_image), frame_count)
+            table.append(toc_ba-tic_ba)
+            total_time+=toc_ba-tic_ba
+            table.append(total_time)
+
+        ##############################################################################
+        # 7 Save Debug table.
+        ##############################################################################
+        if self._debug:
+            with open(self._directory_name+"debug/table.dat", "a") as myfile:
+                np.savetxt(myfile, [table], fmt="%.5f")
 
         return current_pose, True
 
