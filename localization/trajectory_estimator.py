@@ -302,11 +302,15 @@ class TrajectoryEstimator():
         #############################################################################
         # 1 Image undistort.
         #############################################################################
-        # tic_ba = time.time()
-        # TODO undistort image
-        # TODO: Create a debug folder:
-        # toc_ba = time.time()
-
+        tic_ba = time.time()
+        image = cv2.undistort(image, self._camera.calibration.matrix(), self._camera.distortion)
+        toc_ba = time.time()
+        print('Undistort spents ', toc_ba-tic_ba, 's')
+        # if self._debug:
+        #     if not os.path.exists(self._directory_name+"debug/undistort_images/"):
+        #         os.mkdir(self._directory_name+"debug/undistort_images/")
+        #     output_path = self._directory_name+'debug/undistort_images/frame_%d' % frame_count+'.jpg'
+        #     cv2.imwrite(output_path, image*255)
 
         #############################################################################
         # 2 Superpoint Feature Extraction.
