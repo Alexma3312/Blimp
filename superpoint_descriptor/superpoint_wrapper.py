@@ -5,9 +5,12 @@ import os
 import cv2
 import numpy as np
 
+from mapping.bundle_adjustment.parser import get_matches
+from superpoint_descriptor.superpoint_config import (conf_thresh, cuda,
+                                                     nms_dist, nn_thresh,
+                                                     weights_path)
 from SuperPointPretrainedNetwork.demo_superpoint import (PointTracker,
                                                          SuperPointFrontend)
-from mapping.bundle_adjustment.parser import get_matches
 
 # pylint: disable=no-member
 
@@ -32,15 +35,15 @@ MYJET = np.array([[0., 0., 0.5],
 class SuperpointWrapper(object):
     """Save superpoint extracted features to files."""
 
-    def __init__(self, image_directory_path='SuperPointPretrainedNetwork/feature_extraction/undistort_images/', image_extension='*.jpg', image_size=(640, 480), nn_thresh=0.7):
+    def __init__(self, image_directory_path='SuperPointPretrainedNetwork/feature_extraction/', image_extension='*.jpg', image_size=(640, 480), nn_thresh=0.7):
         self.basedir = image_directory_path
         self.img_extension = image_extension
         self.nn_thresh = nn_thresh
-        self._fe = SuperPointFrontend(weights_path="SuperPointPretrainedNetwork/superpoint_v1.pth",
-                                      nms_dist=4,
-                                      conf_thresh=0.015,
-                                      nn_thresh=0.7,
-                                      cuda=False)
+        self._fe = SuperPointFrontend(weights_path=weights_path,
+                                      nms_dist=nms_dist,
+                                      conf_thresh=conf_thresh,
+                                      nn_thresh=nn_thresh,
+                                      cuda=cuda)
         self.point_tracker = PointTracker(5, self.nn_thresh)
         self.img_size = image_size
         self.img_paths = self.get_image_paths()
@@ -83,7 +86,8 @@ class SuperpointWrapper(object):
     def get_image_paths(self):
         """Get all image paths within the directory."""
         print('==> Processing Image Directory Input.')
-        search = os.path.join(self.basedir, self.img_extension)
+        search = os.path.join(
+            self.basedir+'undistort_images/', '*'+self.img_extension)
         img_paths = glob.glob(search)
         img_paths.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
         print("Number of Images: ", len(img_paths))
@@ -157,7 +161,7 @@ class SuperpointWrapper(object):
             cv2.putText(out2, 'Raw Point Confidences', FONT_PT,
                         FONT, FONT_SC, FONT_CLR, lineType=16)
 
-        out_dir_1 = self.basedir+'feature_image/'
+        out_dir_1 = self.basedir+'feature_images/'
         if not os.path.exists(out_dir_1):
             os.mkdir(out_dir_1)
         out_file_1 = out_dir_1+'frame_%05d' % index+'.jpg'
@@ -196,6 +200,298 @@ class SuperpointWrapper(object):
                 self.save_match_images(
                     i, j, good_matches, keypoints_1, keypoints_2)
 
+    def get_all_feature_matches_FLANN(self, calibration, ratio_thresh=0.7, threshold=1):
+        """Get feature matches of every two images"""
+        image_number = len(self.img_paths)
+        for i in range(image_number-1):
+            for j in range(i+1, image_number):
+                grayim_1 = self.read_image(self.img_paths[i])
+                grayim_2 = self.read_image(self.img_paths[j])
+                keypoints_1, descriptors_1, _ = self.superpoint_generator(
+                    grayim_1)
+                keypoints_2, descriptors_2, _ = self.superpoint_generator(
+                    grayim_2)
+
+                matcher = cv2.DescriptorMatcher_create(
+                    cv2.DescriptorMatcher_FLANNBASED)
+                knn_matches = matcher.knnMatch(descriptors_1, descriptors_2, 2)
+                # -- Filter matches using the Lowe's ratio test
+                good_matches = []
+                for m, n in knn_matches:
+                    if m.distance < ratio_thresh * n.distance:
+                        good_matches.append(m)
+
+                flag, new_good_matches, essential_matrix, Rij = self.ransac_filter_flann(
+                    good_matches, keypoints_1, keypoints_2, threshold, calibration)
+                if flag:
+                    print(
+                        "Not enough points to generate essential matrix for image_", i, " and image_", j)
+                    continue
+                print("Matches between image {} and image {} (ransac filter/two way NN matches): ".format(i, j),
+                      new_good_matches.shape[0], "/", len(knn_matches))
+                self.save_feature_matches(
+                    i, j, new_good_matches)
+                self.save_match_images(
+                    i, j, new_good_matches, keypoints_1, keypoints_2)
+
+                # Save essential matrix
+                self.save_essential_matrix(i, j, essential_matrix)
+                self.save_relative_rotation_matrix(i, j, Rij)
+
+
+    def plot_histogram(self, idx1, idx2, desc1, desc2, img_idx1,img_idx2, keypoints_1, keypoints_2, reverse = 0):
+        """
+        Input:
+            idx1 - the match pair queryIdx
+            idx2 - the match pair trainIdx
+            desc1 - an array of descriptors
+            desc2 - an array of descriptors
+        """
+
+        from matplotlib import pyplot as plt
+        histogram_1 = np.zeros((desc2.shape[0],1))
+        histogram_2 = np.zeros((desc1.shape[0],1))
+        for i,desc in enumerate(desc2):
+            histogram_1[i] = np.linalg.norm(desc1[idx1]-desc)
+        for i,desc in enumerate(desc1):
+            histogram_2[i] = np.linalg.norm(desc1[idx1]-desc)
+        fig =plt.hist(histogram_2,bins='auto',range = (0.6,2)) 
+        plt.title("histogram_1") 
+        plt.show()
+        plt.close()
+
+        fig =plt.hist(histogram_1,bins=3)#'auto') 
+        plt.title("histogram_2") 
+        # plt.show()
+        out_dir = self.basedir+'histogram/'
+        if reverse == 0:
+            filename = out_dir+"match_{}_{}_{}{}{}.png".format(img_idx1,img_idx2,idx1,0,reverse)
+        if reverse == 1:
+            filename = out_dir+"match_{}_{}_{}{}{}.png".format(img_idx2,img_idx1,idx2,0,reverse)
+        plt.savefig(filename)
+        plt.close()
+        img1 = cv2.imread(self.img_paths[img_idx1])
+        img2 = cv2.imread(self.img_paths[img_idx2])
+        vis = np.concatenate((img1, img2), axis=1)
+        idx_list = np.argpartition(np.squeeze(histogram_1,axis=1), 10)[:10]
+        for match in idx_list:
+            pt_src = (int(keypoints_1[int(idx1)][0]), int(
+                keypoints_1[int(idx1)][1]))
+            pt_dst = (int(keypoints_2[int(match)][0]+self.img_size[0]),
+                    int(keypoints_2[int(match)][1]))
+
+            cv2.circle(vis, pt_src, 3, (0, 255, 0), -1, lineType=16)
+            color = 255/100*int(histogram_1[match]*50)
+            cv2.circle(vis, pt_dst, 3, (0, color, 0), -1, lineType=16)
+            cv2.line(vis, pt_src, pt_dst, (255, 0, 255), 1)
+        b,g,r = cv2.split(vis)
+        frame_rgb = cv2.merge((r,g,b))
+        plt.imshow(frame_rgb)
+        # # Pause here 5 seconds.
+        plt.show()
+        import os.path
+        import time
+        if reverse == 0:
+            filename = out_dir+"match_{}_{}_{}{}{}.png".format(img_idx1,img_idx2,idx1,1,reverse)
+        if reverse == 1:
+            filename = out_dir+"match_{}_{}_{}{}{}.png".format(img_idx2,img_idx1,idx2,1,reverse)
+        plt.imsave(filename,frame_rgb)
+
+    def keypoint_normalize(self,keypoints_1,keypoints_2, shape1, shape2):
+        """Normalize keypoint to [-0.5,0.5]"""
+        keypoints_1_normalize = keypoints_1.copy()
+        keypoints_1_normalize[:,0] /= shape1[1]
+        keypoints_1_normalize[:,0] -= 0.5
+        keypoints_1_normalize[:,1] /= shape1[0]
+        keypoints_1_normalize[:,1] -= 0.5
+        keypoints_2_normalize = keypoints_2.copy()
+        keypoints_2_normalize[:,0] /= shape2[1]
+        keypoints_2_normalize[:,0] -= 0.5
+        keypoints_2_normalize[:,1] /= shape2[0]
+        keypoints_2_normalize[:,1] -= 0.5
+        return keypoints_1_normalize, keypoints_2_normalize
+
+    def robust_feature_matches(self, calibration, ratio_thresh=0.7, threshold=1, nn_thresh = 0.7):
+        """Get feature matches of every two images"""
+        image_number = len(self.img_paths)
+        for i in range(image_number-1):
+            for j in range(i+1, image_number):
+                grayim_1 = self.read_image(self.img_paths[i])
+                grayim_2 = self.read_image(self.img_paths[j])
+                keypoints_1, descriptors_1, _ = self.superpoint_generator(
+                    grayim_1)
+                keypoints_2, descriptors_2, _ = self.superpoint_generator(
+                    grayim_2)
+
+                matcher = cv2.DescriptorMatcher_create(
+                    cv2.DescriptorMatcher_FLANNBASED)
+                knn_matches = matcher.knnMatch(descriptors_1, descriptors_2, 3)
+                knn_matches_rev = matcher.knnMatch(descriptors_2, descriptors_1, 3)
+
+                # if not ((i==0 and j==7) or(i==5 and j==7) or (i == 7 and j==8) or (i==11 and j==14) or (i==12 and j==15) or (i==16 and j==17)):
+                #     continue
+                # -- Filter matches using the Lowe's ratio test
+                good_matches = []
+                for m, n in knn_matches:
+                    if m.distance < ratio_thresh * n.distance and m.distance<nn_thresh:
+                        for m2,n2 in knn_matches_rev:
+                            if m2.queryIdx != m.trainIdx:
+                                continue
+                            if m2.queryIdx == m.trainIdx:
+                                if m2.distance < ratio_thresh * n2.distance and m2.trainIdx == m.queryIdx and m2.distance<nn_thresh:
+                                    good_matches.append(m)
+                                    self.plot_histogram(m.queryIdx, m.trainIdx, descriptors_1, descriptors_2, i,j, keypoints_1, keypoints_2)
+                                    self.plot_histogram(m.trainIdx, m.queryIdx, descriptors_2, descriptors_1, j,i, keypoints_2, keypoints_1,reverse=1)
+                                
+                                break
+                # Normalize keypoints    
+                keypoints_1_normalize, keypoints_2_normalize = self.keypoint_normalize(keypoints_1, keypoints_2, grayim_1.shape, grayim_2.shape)
+                # flag, new_good_matches, essential_matrix, Rij = self.ransac_filter_flann(
+                #     good_matches, keypoints_1, keypoints_2, threshold, calibration)
+                flag, new_good_matches, essential_matrix, Rij = self.ransac_filter_flann(
+                    good_matches, keypoints_1_normalize, keypoints_2_normalize, 0.01, calibration)
+
+                if flag:
+                    print(
+                        "Not enough points to generate essential matrix for image_", i, " and image_", j)
+                    continue
+                print("Matches between image {} and image {} (ransac filter/two way NN matches): ".format(i, j),
+                      new_good_matches.shape[0], "/", len(knn_matches))
+                self.save_feature_matches(
+                    i, j, new_good_matches)
+                self.save_match_images(
+                    i, j, new_good_matches, keypoints_1, keypoints_2)
+
+                # Save essential matrix
+                self.save_essential_matrix(i, j, essential_matrix)
+                self.save_relative_rotation_matrix(i, j, Rij)
+
+    def get_ORB_feature_matches_FLANN(self, calibration, ratio_thresh=0.7, threshold=1):
+        """Get feature matches of every two images"""
+        image_number = len(self.img_paths)
+        for i in range(image_number-1):
+            for j in range(i+1, image_number):
+                grayim_1 = cv2.imread(self.img_paths[i],0)
+                grayim_2 = cv2.imread(self.img_paths[j],0)
+                orb = cv2.ORB_create()
+                keypoints_1, descriptors_1 = orb.detectAndCompute(grayim_1,None)
+                keypoints_2, descriptors_2 = orb.detectAndCompute(grayim_2,None)
+                keypoints_1 = np.array([point.pt for point in keypoints_1])
+                keypoints_2 = np.array([point.pt for point in keypoints_2])
+
+                matcher = cv2.DescriptorMatcher_create(
+                    cv2.DescriptorMatcher_FLANNBASED)
+
+                knn_matches=matcher.knnMatch(np.asarray(descriptors_1,np.float32),np.asarray(descriptors_2,np.float32), 2) #2
+                knn_matches_rev=matcher.knnMatch(np.asarray(descriptors_2,np.float32),np.asarray(descriptors_1,np.float32), 2) #2
+
+                # -- Filter matches using the Lowe's ratio test
+                good_matches = []
+                for m, n in knn_matches:
+                    if m.distance < ratio_thresh * n.distance:
+                        for m2,n2 in knn_matches_rev:
+                            if m2.queryIdx != m.trainIdx:
+                                continue
+                            if m2.queryIdx == m.trainIdx:
+                                if m2.distance < ratio_thresh * n2.distance and m2.trainIdx == m.queryIdx:
+                                    good_matches.append(m)
+                                break
+                flag, new_good_matches, essential_matrix, Rij = self.ransac_filter_flann(
+                    good_matches, keypoints_1, keypoints_2, threshold, calibration)
+
+                if flag:
+                    print(
+                        "Not enough points to generate essential matrix for image_", i, " and image_", j)
+                    continue
+                print("Matches between image {} and image {} (ransac filter/two way NN matches): ".format(i, j),
+                      new_good_matches.shape[0], "/", len(knn_matches))
+                self.save_feature_matches(
+                    i, j, new_good_matches)
+                self.save_match_images(
+                    i, j, new_good_matches, keypoints_1, keypoints_2)
+
+                # Save essential matrix
+                self.save_essential_matrix(i, j, essential_matrix)
+                self.save_relative_rotation_matrix(i, j, Rij)
+    
+    def get_select_feature_matches_FLANN(self, calibration, ratio_thresh=0.7, threshold=1, rows=2, cols=3, angles=8):
+        """Get feature matches of selected image pairs."""
+        image_number = len(self.img_paths)
+        for i in range(image_number-1):
+            for j in range(i+1, image_number):
+                yi_idx = i // (cols*angles)
+                xi_idx = (i % (cols*angles))//angles
+                yj_idx = j // (cols*angles)
+                xj_idx = (j % (cols*angles))//angles
+                if (yi_idx == yj_idx) and (xi_idx == xj_idx):
+                    if i == 0 and j == 1:
+                        file_name = self.basedir+'matches/essential_matrices.dat'
+                        with open(file_name, 'w') as f1:
+                            f1.write("/* Format: \n frame_1_idx frame_2_idx essential matrix */\n")
+                        file_name = self.basedir+'matches/rotation.dat'
+                        with open(file_name, 'w') as f2:
+                            f2.write("/* Format: \n frame_1_idx frame_2_idx rotation matrix */\n")
+                    continue
+                
+                grayim_1 = self.read_image(self.img_paths[i])
+                grayim_2 = self.read_image(self.img_paths[j])
+                keypoints_1, descriptors_1, _ = self.superpoint_generator(
+                    grayim_1)
+                keypoints_2, descriptors_2, _ = self.superpoint_generator(
+                    grayim_2)
+
+                matcher = cv2.DescriptorMatcher_create(
+                    cv2.DescriptorMatcher_FLANNBASED)
+                knn_matches = matcher.knnMatch(descriptors_1, descriptors_2, 2)
+                # -- Filter matches using the Lowe's ratio test
+                good_matches = []
+                for m, n in knn_matches:
+                    if m.distance < ratio_thresh * n.distance:
+                        good_matches.append(m)
+
+                flag, new_good_matches, essential_matrix, Rij = self.ransac_filter_flann(
+                    good_matches, keypoints_1, keypoints_2, threshold, calibration)
+                if flag:
+                    print(
+                        "Not enough points to generate essential matrix for image_", i, " and image_", j)
+                    continue
+                print("Matches between image {} and image {} (ransac filter/two way NN matches): ".format(i, j),
+                      new_good_matches.shape[0], "/", len(knn_matches))
+                self.save_feature_matches(
+                    i, j, new_good_matches)
+                self.save_match_images(
+                    i, j, new_good_matches, keypoints_1, keypoints_2)
+
+                # Save essential matrix
+                self.save_essential_matrix(i, j, essential_matrix)
+                self.save_relative_rotation_matrix(i, j, Rij)
+
+    def ransac_filter_flann(self, matches, keypoints_1, keypoints_2, threshold, calibration):
+        """Use opencv ransac to filter matches."""
+        src = np.array([], dtype=np.float).reshape(0, 2)
+        dst = np.array([], dtype=np.float).reshape(0, 2)
+        for match in matches:
+            src = np.vstack((src, keypoints_1[int(match.queryIdx)]))
+            dst = np.vstack((dst, keypoints_2[int(match.trainIdx)]))
+
+        if src.shape[0] < 20:
+            return True, np.array([]), np.array([]), np.array([])
+
+        src = np.expand_dims(src, axis=1)
+        dst = np.expand_dims(dst, axis=1)
+        # https://answers.opencv.org/question/31421/opencv-3-essentialmatrix-and-recoverpose/
+        # https://stackoverflow.com/questions/32175286/strange-issue-with-stereo-triangulation-two-valid-solutions/36213818#36213818
+        E, mask = cv2.findEssentialMat(
+            dst, src, cameraMatrix=calibration.matrix(), method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        _,R,t,mask_new = cv2.recoverPose(E,dst,src,calibration.matrix())
+
+        if mask is None:
+            return True, np.array([]), np.array([]), np.array([])
+        good_matches = np.array([[matches[i].queryIdx, matches[i].trainIdx]
+                                 for i, score in enumerate(mask) if score == 1])
+
+        return False, good_matches, E, R
+
     def ransac_filter_opencv(self, matches, keypoints_1, keypoints_2, threshold, calibration):
         """Use opencv ransac to filter matches."""
         src = np.array([], dtype=np.float).reshape(0, 2)
@@ -210,14 +506,10 @@ class SuperpointWrapper(object):
         src = np.expand_dims(src, axis=1)
         dst = np.expand_dims(dst, axis=1)
         E, mask = cv2.findEssentialMat(
-            dst, src, cameraMatrix=calibration, method=cv2.RANSAC, prob=0.999, threshold=threshold)
-        print("E:\n",E)
-        R1, R2, T = cv2.decomposeEssentialMat(E)
-        print("R1:\n",R1)
-        print("R2:\n",R2)
-        print("T:\n",T)
-        fundamental_mat, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 1, 0.99)
-        print("fundamental_mat:\n",fundamental_mat)
+            dst, src, cameraMatrix=calibration.matrix(), method=cv2.RANSAC, prob=0.999, threshold=threshold)
+        # R1, R2, T = cv2.decomposeEssentialMat(E)
+        # fundamental_mat, mask = cv2.findFundamentalMat(
+        #     src, dst, cv2.FM_RANSAC, 1, 0.99)
 
         if mask is None:
             return True, np.array([])
@@ -226,6 +518,59 @@ class SuperpointWrapper(object):
         good_matches = np.array(good_matches)[:, :2]
 
         return False, good_matches
+
+    def save_descriptor_distance(self, idx1, idx2,knn_matches):
+        """Save the descriptor distance into a file."""
+        # Create a file called L2_distances.dat
+        dir_name = self.basedir+'matches/'
+        file_name = dir_name+'L2_distances.dat'
+        if idx1 == 0 and idx2 == 1:
+            f = open(file_name, 'w')
+            f.write("/* Format: \n frame_1_idx frame_2_idx 0 1 2 3 4 5 6 7 8 9 */\n")
+            f.close
+        if os.path.exists(file_name):
+            f = open(file_name, "a")
+            f.write("{} {} ".format(idx1, idx2))
+            for distance in knn_matches:
+                    f.write("{} ".format(distance))
+            f.write("\n")
+            f.close()
+
+    def save_essential_matrix(self, idx1, idx2, essential_matrix):
+        """Save the essential matrices into a file."""
+        # Create a file called essential_matrices.dat
+        dir_name = self.basedir+'matches/'
+        file_name = dir_name+'essential_matrices.dat'
+        if idx1 == 0 and idx2 == 1:
+            f = open(file_name, 'w')
+            f.write("/* Format: \n frame_1_idx frame_2_idx essential matrix */\n")
+            f.close
+        if os.path.exists(file_name):
+            f = open(file_name, "a")
+            f.write("{} {} ".format(idx1, idx2))
+            for i in range(3):
+                for j in range(3):
+                    f.write("{} ".format(essential_matrix[i,j]))
+            f.write("\n")
+            f.close()
+    
+    def save_relative_rotation_matrix(self, idx1, idx2, Rij):
+        """Save the essential matrices into a file."""
+        # Create a file called essential_matrices.dat
+        dir_name = self.basedir+'matches/'
+        file_name = dir_name+'rotation.dat'
+        if idx1 == 0 and idx2 == 1:
+            f = open(file_name, 'w')
+            f.write("/* Format: \n frame_1_idx frame_2_idx rotation matrix */\n")
+            f.close
+        if os.path.exists(file_name):
+            f = open(file_name, "a")
+            f.write("{} {} ".format(idx1, idx2))
+            for i in range(3):
+                for j in range(3):
+                    f.write("{} ".format(Rij[i,j]))
+            f.write("\n")
+            f.close()
 
     def save_feature_matches(self, idx1, idx2, matches, save_dir='matches/'):
         """Save the feature matches of index 1 image and index 2 image."""
@@ -247,9 +592,9 @@ class SuperpointWrapper(object):
             f.write("/* Format: \n frame_1_idx frame_2_idx \n num_of_matches\n frame_1_idx feature_idx frame_2_idx feature_idx */\n" +
                     str(idx1)+' '+str(idx2)+'\n'+str(matches_number)+'\n'+content)
 
-    def save_match_images(self, idx1, idx2, matches, keypoints_1, keypoints_2):
+    def save_match_images(self, idx1, idx2, matches, keypoints_1, keypoints_2, save_dir='match_images/'):
         """Create an image to display matches between an image pair."""
-        dir_name = self.basedir+'match_images/'
+        dir_name = self.basedir+save_dir
         if not os.path.exists(dir_name):
             os.mkdir(dir_name)
         file_name = dir_name+'match_{}_{}.jpg'.format(idx1, idx2)
@@ -260,7 +605,7 @@ class SuperpointWrapper(object):
         for match in matches:
             pt_src = (int(keypoints_1[int(match[0])][0]), int(
                 keypoints_1[int(match[0])][1]))
-            pt_dst = (int(keypoints_2[int(match[1])][0]+640),
+            pt_dst = (int(keypoints_2[int(match[1])][0]+self.img_size[0]),
                       int(keypoints_2[int(match[1])][1]))
 
             cv2.circle(vis, pt_src, 3, (0, 255, 0), -1, lineType=16)
@@ -272,17 +617,21 @@ class SuperpointWrapper(object):
         """Performs two-way nearest neighbor matching of two sets of descriptors, 
             such that the NN match from descriptor A->B must equal the NN match from B->A"""
         dir_name_1 = self.basedir+'matches/'
-        dir_name_2 = self.basedir+'4d_matches/'
+        # dir_name_2 = self.basedir+'4d_matches/'
         image_number = len(self.img_paths)
         for i in range(image_number-1):
             for j in range(i+1, image_number):
                 file_name_1 = dir_name_1+'match_{}_{}.dat'.format(i, j)
+                if not os.path.exists(file_name_1):
+                    continue
                 _, matches = get_matches(file_name_1)
                 matches = np.array(matches)[:, (1, 3)]
 
-                file_name_2 = dir_name_2+'match_{}_{}.dat'.format(i, j)
-                _, matches_4d = get_matches(file_name_2)
-                matches_4d = np.array(matches_4d)[:, (1, 3)]
+                # file_name_2 = dir_name_2+'match_{}_{}.dat'.format(i, j)
+                # if not os.path.exists(file_name_2):
+                #     continue
+                # _, matches_4d = get_matches(file_name_2)
+                # matches_4d = np.array(matches_4d)[:, (1, 3)]
 
                 # Get intersecting rows across two 2D numpy arrays
                 new_matches = np.array(

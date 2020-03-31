@@ -8,7 +8,7 @@ import cv2
 import numpy as np
 
 
-def undistort(basedir, img_extension, output_dir, output_prefix, calibration, distortion, undist_calibration, rectification=np.identity(3)):
+def undistort(basedir, img_extension, output_dir, output_prefix, calibration, distortion, undist_calibration='', rectification=np.identity(3)):
     """A function to undistort the distorted images in a folder."""
     search = os.path.join(basedir, '*'+img_extension)
     img_paths = glob.glob(search)

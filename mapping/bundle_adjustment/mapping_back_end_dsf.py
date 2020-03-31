@@ -37,7 +37,7 @@ class MappingBackEnd():
         backprojection_depth - the estimated depth used in back projection
     """
 
-    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20):
+    def __init__(self, data_directory, num_images, calibration, pose_estimates, measurement_noise, pose_prior_noise, filter_bad_landmarks_enable=True, min_obersvation_number=4, prob=0.9, threshold=3, backprojection_depth=20, prior_indices=(0, 1)):
         """Construct by reading from a data directory."""
         # Parameters for CV2 find Essential matrix
         self._cv_prob = prob
@@ -53,6 +53,7 @@ class MappingBackEnd():
         self._pose_estimates = pose_estimates
         self._measurement_noise = measurement_noise
         self._pose_prior_noise = pose_prior_noise
+        self._prior_indices = prior_indices
         # Store all features and descriptors
         self._image_features = [self.load_features(
             image_index)[0] for image_index in range(self._nrimages)]
@@ -66,7 +67,7 @@ class MappingBackEnd():
         """ Load features from .key files
         """
         feat_file = os.path.join(
-            self._basedir, "{0:07}.key".format(image_index))
+            self._basedir+'features/', "{0:07}.key".format(image_index))
         keypoints, descriptors = load_features(feat_file)
         return keypoints, descriptors
 
@@ -75,53 +76,19 @@ class MappingBackEnd():
             matches - a list of [image 1 index, image 1 keypoint index, image 2 index, image 2 keypoint index]
         """
         matches_file = os.path.join(
-            self._basedir, "match_{0}_{1}.dat".format(frame_1, frame_2))
+            self._basedir+'matches/', "match_{0}_{1}.dat".format(frame_1, frame_2))
         if os.path.isfile(matches_file) is False:
             return []
         _, matches = get_matches(matches_file)
         return matches
 
-    def ransac_filter_keypoints(self, matches, idx1, idx2):
-        """Use opencv ransac to filter matches."""
-        src = np.array([], dtype=np.float).reshape(0, 2)
-        dst = np.array([], dtype=np.float).reshape(0, 2)
-        for match in matches:
-            kp_src = self._image_features[idx1][int(match[1])]
-            kp_dst = self._image_features[idx2][int(match[3])]
-            src = np.vstack((src, [float(kp_src.x()), float(kp_src.y())]))
-            dst = np.vstack((dst, [float(kp_dst.x()), float(kp_dst.y())]))
-
-        if src.shape[0] < 6:
-            return True, []
-
-        src = np.expand_dims(src, axis=1)
-        dst = np.expand_dims(dst, axis=1)
-        # Essential Matrix and RANSAC filter
-        _, mask = cv2.findEssentialMat(
-            dst, src, cameraMatrix=self._calibration.matrix(), method=cv2.RANSAC, prob=self._cv_prob, threshold=self._cv_threshold)
-        # Fundamental Matrix and RANSAC filter
-        # _, mask = cv2.findFundamentalMat(src, dst, cv2.FM_RANSAC, 0.01, 0.999)
-        if mask is None:
-            return True, np.array([])
-
-        good_matches = [matches[i]
-                        for i, score in enumerate(mask) if score == 1]
-        return False, good_matches
-
-    def generate_dsf(self, enable=True):
+    def generate_dsf(self):
         """Use dsf to find data association between landmark and landmark observation(features)"""
         dsf = gtsam.DSFMapIndexPair()
 
         for i in range(0, self._nrimages-1):
             for j in range(i+1, self._nrimages):
                 matches = self.load_matches(i, j)
-                if enable:
-                    bad_essential, matches = self.ransac_filter_keypoints(
-                        matches, i, j)
-                    if bad_essential:
-                        print(
-                            "Not enough points to generate essential matrix for image_", i, " and image_", j)
-                        continue
                 for frame_1, keypt_1, frame_2, keypt_2 in matches:
                     dsf.merge(gtsam.IndexPair(frame_1, keypt_1),
                               gtsam.IndexPair(frame_2, keypt_2))
@@ -182,10 +149,10 @@ class MappingBackEnd():
 
         return landmark_map_new
 
-    def create_landmark_map(self, enable=True):
+    def create_landmark_map(self):
         """Create a list to map landmarks and their correspondences.
             [Landmark_i:[(i,Point2()), (j,Point2())...]...]"""
-        dsf = self.generate_dsf(enable)
+        dsf = self.generate_dsf()
         landmark_map = defaultdict(list)
         for img_index, feature_list in enumerate(self._image_features):
             for feature_index, feature in enumerate(feature_list):
@@ -210,7 +177,7 @@ class MappingBackEnd():
         # Transfer normalized key_point into homogeneous coordinate and scale with depth
         ph = Point3(depth*pn.x(), depth*pn.y(), depth)
         # Transfer the point into the world coordinate
-        return pose.transform_from(ph)
+        return pose.transformFrom(ph)
 
     def create_initial_estimate(self):
         """Create initial estimate with landmark map.
@@ -219,19 +186,34 @@ class MappingBackEnd():
                 landmark_map - list, A map of landmarks and their correspondence
         """
         initial_estimate = gtsam.Values()
-
         # Initial estimate for landmarks
         for landmark_idx, observation_list in enumerate(self._landmark_map):
-            key_point = observation_list[0][1]
-            pose_idx = observation_list[0][0]
-            pose = self._pose_estimates[pose_idx]
-            landmark_3d_point = self.back_projection(
-                key_point, pose, self._depth)
-            # To test indeterminate system
-            # if(landmark_idx == 477 or landmark_idx == 197 or landmark_idx == 204 or landmark_idx == 458 or landmark_idx == 627 or landmark_idx == 198):
-            #     continue
+            # Average initial estimates
+            landmark_3d_point = np.zeros((3, 1))
+            for observation in observation_list:
+                key_point = observation_list[0][1]
+                pose_idx = observation_list[0][0]
+                pose = self._pose_estimates[pose_idx]
+                estimate_landmark = self.back_projection(
+                    key_point, pose, self._depth)
+                landmark_3d_point[0] += estimate_landmark.x()
+                landmark_3d_point[1] += estimate_landmark.y()
+                landmark_3d_point[2] += estimate_landmark.z()
+            landmark_3d_point = landmark_3d_point/len(observation_list)
+            landmark_3d_point = Point3(
+                landmark_3d_point[0, 0], landmark_3d_point[1, 0], landmark_3d_point[2, 0])
+
+            # Check to see if there are points that does not meet cheirality check
+            for observation in observation_list:
+                pose_idx = observation_list[0][0]
+                pose = self._pose_estimates[pose_idx]
+                camera = gtsam.SimpleCamera(pose, self._calibration)
+                pn,flag = camera.projectSafe(landmark_3d_point)
+                if flag == False:
+                    print(pose_idx)
+            
             initial_estimate.insert(P(landmark_idx), landmark_3d_point)
-        # Filter valid poses
+        # Get valid poses
         valid_pose_indices = set()
         for observation_list in self._landmark_map:
             for observation in observation_list:
@@ -241,8 +223,23 @@ class MappingBackEnd():
         for pose_idx in valid_pose_indices:
             initial_estimate.insert(
                 X(pose_idx), self._pose_estimates[pose_idx])
-
         return initial_estimate
+
+    def cheirality_check(self, initial_estimate, landmark_map):
+        """
+        Check cheirality on all data to reduce the risk of Bundle Adjustment Failure.
+        Parameters:
+            calibration - gtsam.Cal3_S2, camera calibration
+            landmark_map - list, A map of landmarks and their correspondence
+        """
+        # for landmark_idx, observation_list in enumerate(landmark_map):
+        #     # Average initial estimates
+        #     for observation in observation_list:
+        #         key_point = observation_list[0][1]
+        #         pose_idx = observation_list[0][0]
+        #         pose = self._pose_estimates[pose_idx]
+
+        pass
 
     def bundle_adjustment(self):
         """
@@ -265,9 +262,6 @@ class MappingBackEnd():
             for obersvation in observation_list:
                 pose_idx = obersvation[0]
                 key_point = obersvation[1]
-                # To test indeterminate system
-                # if(landmark_idx == 477 or landmark_idx == 197 or landmark_idx == 204 or landmark_idx == 458 or landmark_idx == 627 or landmark_idx == 198):
-                #     continue
                 graph.add(gtsam.GenericProjectionFactorCal3_S2(
                     key_point, self._measurement_noise,
                     X(pose_idx), P(landmark_idx), self._calibration))
@@ -280,7 +274,7 @@ class MappingBackEnd():
         #   pose_noise_sigmas = np.array([rotation_sigma, rotation_sigma, rotation_sigma,
         #                             translation_sigma, translation_sigma, translation_sigma])
         # """
-        for idx in (0, 1):
+        for idx in (self._prior_indices[0], self._prior_indices[1]):
             pose_i = initial_estimate.atPose3(X(idx))
             graph.add(gtsam.PriorFactorPose3(
                 X(idx), pose_i, self._pose_prior_noise))
@@ -294,8 +288,8 @@ class MappingBackEnd():
 
         sfm_result = optimizer.optimize()
         # Check if factor covariances are under constrain
-        marginals = gtsam.Marginals(  # pylint: disable=unused-variable
-            graph, sfm_result)
+        # marginals = gtsam.Marginals(  # pylint: disable=unused-variable
+        #     graph, sfm_result)
         return sfm_result
 
     def get_landmark_descriptor(self, observation_list):

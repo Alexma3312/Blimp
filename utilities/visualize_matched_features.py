@@ -8,7 +8,7 @@ import os
 import cv2
 import numpy as np
 
-from feature_matcher.parser import get_matches, load_features
+from mapping.bundle_adjustment.parser import get_matches, load_features
 
 def read_features(basedir, image_index):
     """ Load features from .key files

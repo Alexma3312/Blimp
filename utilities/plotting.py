@@ -110,7 +110,7 @@ def plot_with_results(result1, result2, x_axe=30, y_axe=30, z_axe=30, figure_num
     plt.show()
 
 
-def plot_trajectory(landmarks, trajectory, x_axe=30, y_axe=30, z_axe=30, axis_length=2, figure_number=0):
+def plot_map(landmarks, figure_number=0, x_axe=30, y_axe=30, z_axe=30, axis_length=2):
     """Plot the map and the generated trajectory.
     Parameters:
         landmarks - a list of [x,y,z]
@@ -124,12 +124,87 @@ def plot_trajectory(landmarks, trajectory, x_axe=30, y_axe=30, z_axe=30, axis_le
     for landmark in landmarks:
         gtsam_plot.plot_point3(figure_number, Point3(
             landmark[0], landmark[1], landmark[2]), 'rx')
+    # draw
+    axes.set_xlim3d(-x_axe, x_axe)
+    axes.set_ylim3d(-y_axe, y_axe)
+    axes.set_zlim3d(-z_axe, z_axe)
+    plt.pause(1)
+    plt.legend()
+    # plt.show()
+
+
+def plot_map_ax(landmarks, ax, x_axe=30, y_axe=30, z_axe=30):
+    """Plot the map and the generated trajectory.
+    Parameters:
+        landmarks - a list of [x,y,z]
+        trajectory - a list of Pose3 object
+    """
+    # Plot landmark points
+    for landmark in landmarks:
+        ax.plot([landmark[0]], [landmark[1]], [landmark[2]], 'rx')
+
+    # draw
+    ax.set_xlim3d(-x_axe, x_axe)
+    ax.set_ylim3d(-y_axe, y_axe)
+    ax.set_zlim3d(-z_axe, z_axe)
+    plt.pause(1)
+    plt.legend()
+    # plt.show()
+
+
+def plot_pose_on_axes(ax, pose, axis_length=0.1):
+    """plot poase on axes"""
+    # get rotation and translation (center)
+    gRp = pose.rotation().matrix()  # rotation from pose to global
+    t = pose.translation()
+    origin = np.array([t.x(), t.y(), t.z()])
+
+    # draw the camera axes
+    x_axis = origin + gRp[:, 0] * axis_length
+    line = np.append(origin[np.newaxis], x_axis[np.newaxis], axis=0)
+    ax.plot(line[:, 0], line[:, 1], line[:, 2], 'r-')
+
+    y_axis = origin + gRp[:, 1] * axis_length
+    line = np.append(origin[np.newaxis], y_axis[np.newaxis], axis=0)
+    ax.plot(line[:, 0], line[:, 1], line[:, 2], 'g-')
+
+    z_axis = origin + gRp[:, 2] * axis_length
+    line = np.append(origin[np.newaxis], z_axis[np.newaxis], axis=0)
+    ax.plot(line[:, 0], line[:, 1], line[:, 2], 'b-')
+
+
+def plot_trajectory_ax(trajectory, ax, x_axe=5, y_axe=5, z_axe=5, axis_length=0.3):
+    """Plot the map and the generated trajectory.
+    Parameters:
+        landmarks - a list of [x,y,z]
+        trajectory - a list of Pose3 object
+    """
+    # Plot cameras
+    for pose in trajectory:
+        plot_pose_on_axes(ax, pose, axis_length)
+    # draw
+    ax.set_xlim3d(-x_axe, x_axe)
+    ax.set_ylim3d(-y_axe, y_axe)
+    ax.set_zlim3d(-z_axe, z_axe)
+    plt.pause(1)
+
+
+def plot_trajectory(trajectory, figure_number=0, x_axe=5, y_axe=5, z_axe=5, axis_length=0.3):
+    """Plot the map and the generated trajectory.
+    Parameters:
+        landmarks - a list of [x,y,z]
+        trajectory - a list of Pose3 object
+    """
+    # Declare an id for the figure
+    fig = plt.figure(figure_number)
+    axes = fig.gca(projection='3d')
     # Plot cameras
     for pose in trajectory:
         gtsam_plot.plot_pose3(figure_number, pose, axis_length)
-        gRp = pose.rotation().matrix()  # rotation from pose to global
-        t = pose.translation()
-        axes.scatter([t.x()], [t.y()], [t.z()], s=20, color='red', alpha=1, marker="^")
+        # gRp = pose.rotation().matrix()  # rotation from pose to global
+        # t = pose.translation()
+
+        # axes.scatter([t.x()], [t.y()], [t.z()], s=20, color='red', alpha=1, marker="^")
     # draw
     axes.set_xlim3d(-x_axe, x_axe)
     axes.set_ylim3d(-y_axe, y_axe)
@@ -139,7 +214,7 @@ def plot_trajectory(landmarks, trajectory, x_axe=30, y_axe=30, z_axe=30, axis_le
     # plt.show()
 
 
-def plot_trajectory_verification(landmarks, poses, trajectory, x_axe=30, y_axe=30, z_axe=30, axis_length=2, figure_number=0):
+def plot_trajectory_verification(landmarks, poses, trajectory=[], x_axe=30, y_axe=30, z_axe=30, axis_length=2, figure_number=0):
     """Plot the map, mapping pose results, and the generated trajectory.
     Parameters:
         landmarks - a list of [x,y,z]
@@ -161,8 +236,9 @@ def plot_trajectory_verification(landmarks, poses, trajectory, x_axe=30, y_axe=3
         gtsam_plot.plot_pose3(figure_number, actual_pose_i, axis_length)
         gRp = actual_pose_i.rotation().matrix()  # rotation from pose to global
         t = actual_pose_i.translation()
-        axes.scatter([t.x()], [t.y()], [t.z()], s=20, color='red', alpha=1, marker="^")
-    
+        axes.scatter([t.x()], [t.y()], [t.z()], s=20,
+                     color='red', alpha=1, marker="^")
+
     # Plot cameras
     for pose in trajectory:
         gtsam_plot.plot_pose3(figure_number, pose, axis_length)
@@ -176,6 +252,26 @@ def plot_trajectory_verification(landmarks, poses, trajectory, x_axe=30, y_axe=3
     axes.set_zlim3d(-z_axe, z_axe)
     plt.legend()
     plt.show()
+
+
+def plot_poses(poses, x_axe=30, y_axe=30, z_axe=30, axis_length=2, figure_number=0):
+    """plot the result of sfm"""
+    # Declare an id for the figure
+    fig = plt.figure(figure_number)
+    axes = fig.gca(projection='3d')
+    plt.cla()
+    # Plot cameras
+    for pose in poses:
+        axis_length = axis_length
+        gtsam_plot.plot_pose3(figure_number, pose, axis_length)
+
+    # draw
+    axes.set_xlim3d(-x_axe, x_axe)
+    axes.set_ylim3d(-y_axe, y_axe)
+    axes.set_zlim3d(-z_axe, z_axe)
+    plt.legend()
+    plt.show()
+
 
 # >>>>>>>>>>>>>>>>>>Below is for color map>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 # def plot_pose3_on_axes(axes, pose, axis_length=0.1):

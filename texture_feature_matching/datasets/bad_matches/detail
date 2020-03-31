@@ -1,0 +1,26 @@
+superpoint extraction nnthresh 0.7
+ratio test of ransac for matching 0.7
+
+part of repeat texture and full plane repeat texture
+6,31
+7,15
+13,28
+14,31
+15,31
+15,47
+20,28
+20,36
+27,43
+29,36
+29,38
+29,45-*
+34,42-*
+35,43
+35,44-mirror
+36,44
+36,45
+3,19
+
+22,46 - full plane repeat texture
+19,42 - light
+
