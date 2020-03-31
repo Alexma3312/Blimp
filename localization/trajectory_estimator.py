@@ -296,8 +296,8 @@ class TrajectoryEstimator():
         #############################################################################
         # 0 Create debug folder
         #############################################################################
-        if self._debug and not os.path.exists(self._directory_name+"debug/"):
-            os.mkdir(self._directory_name+"debug/")
+        # if self._debug and not os.path.exists(self._directory_name+"debug/"):
+        #     os.mkdir(self._directory_name+"debug/")
         
         #############################################################################
         # 1 Image undistort.
@@ -480,8 +480,10 @@ class TrajectoryEstimator():
             if self._debug:
                 r = current_pose.rotation().matrix()
                 t = current_pose.translation().vector()
-                np.savetxt(self._directory_name+"debug/poses.dat", np.array([t[0], t[1], t[2], r[0][0], r[0][1], r[0]
-                                    [2], r[1][0], r[1][1], r[1][2], r[2][0], r[2][1], r[2][2]]))
+                with open(self._directory_name+"debug/poses.dat", "a") as myfile:
+                    myfile.write(str(frame_count)+" ")
+                    np.savetxt(myfile, [[t[0], t[1], t[2], r[0][0], r[0][1], r[0]
+                                    [2], r[1][0], r[1][1], r[1][2], r[2][0], r[2][1], r[2][2]]])
 
             if self._visualize is True:
                 # ax2.imshow(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
