@@ -189,7 +189,7 @@ def plot_trajectory_ax(trajectory, ax, x_axe=5, y_axe=5, z_axe=5, axis_length=0.
     plt.pause(1)
 
 
-def plot_trajectory(trajectory, figure_number=0, x_axe=5, y_axe=5, z_axe=5, axis_length=0.3):
+def plot_trajectory(trajectory, figure_number=0, x_axe=5, y_axe=5, z_axe=5, axis_length=0.3, hold = False):
     """Plot the map and the generated trajectory.
     Parameters:
         landmarks - a list of [x,y,z]
@@ -211,7 +211,8 @@ def plot_trajectory(trajectory, figure_number=0, x_axe=5, y_axe=5, z_axe=5, axis
     axes.set_zlim3d(-z_axe, z_axe)
     plt.pause(1)
     # plt.legend()
-    # plt.show()
+    if hold:
+        plt.show()
 
 
 def plot_trajectory_verification(landmarks, poses, trajectory=[], x_axe=30, y_axe=30, z_axe=30, axis_length=2, figure_number=0):

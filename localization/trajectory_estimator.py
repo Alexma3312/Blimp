@@ -19,7 +19,8 @@ from gtsam import Point2, Point3, Pose3, Rot3, symbol
 from localization.features import Features
 from localization.landmark_map import LandmarkMap
 from localization.observed_landmarks import ObservedLandmarks
-from localization.trajectory_estimator_helper import (save_feature_image,
+from localization.trajectory_estimator_helper import (get_keypoints,
+                                                      save_feature_image,
                                                       save_feature_to_file,
                                                       save_match_image)
 from mapping.bundle_adjustment.mapping_result_helper import load_map_from_file
@@ -82,7 +83,7 @@ class TrajectoryEstimator():
         self._point_prior_noise = noise_models[1]
         self._pose_translation_prior_noise = noise_models[2]
         self._fe = fe = SuperPointFrontend(weights_path="SuperPointPretrainedNetwork/superpoint_v1.pth",
-                                           nms_dist=32,
+                                           nms_dist=16,
                                            conf_thresh=0.015,
                                            nn_thresh=0.7,
                                            cuda=True)
@@ -172,6 +173,9 @@ class TrajectoryEstimator():
         # find the minimal score
         # TODO:shicong, add a ratio test to filter bad points
         min_score = np.amin(dmat)
+        # second_min_score = np.amin(dmat[dmat != np.amin(dmat)])
+        # if min_score < 0.7*second_min_score:
+        #     print(key_point[0], key_point[1])
         if min_score < self.l2_threshold:
             desc_index = np.where(dmat == min_score)
             landmark_index = landmark_indices[int(desc_index[0][0])]
@@ -238,8 +242,10 @@ class TrajectoryEstimator():
                 (object_points, [observation[1].x(), observation[1].y(), observation[1].z()]))
 
         # https://stackoverflow.com/questions/35650105/what-are-python-constants-for-cv2-solvepnp-method-flag
+        # retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
+        #     object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_DLS)
         retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
-            object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_DLS)
+            object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_P3P)
         rotation, _ = cv2.Rodrigues(rvecs)
         rotation = rotation.T
         translation = -np.dot(rotation.T, tvecs)
@@ -309,10 +315,11 @@ class TrajectoryEstimator():
         toc_ba = time.time()
         print('Undistort spents ', toc_ba-tic_ba, 's')
         if self._debug:
-        #     if not os.path.exists(self._directory_name+"debug/undistort_images/"):
-        #         os.mkdir(self._directory_name+"debug/undistort_images/")
-        #     output_path = self._directory_name+'debug/undistort_images/frame_%d' % frame_count+'.jpg'
-        #     cv2.imwrite(output_path, image*255)
+            color_image = cv2.undistort(color_image, self._camera.calibration.matrix(), self._camera.distortion)
+            # if not os.path.exists(self._directory_name+"debug/undistort_images/"):
+            #     os.mkdir(self._directory_name+"debug/undistort_images/")
+            # output_path = self._directory_name+'debug/undistort_images/frame_%d' % frame_count+'.jpg'
+            # cv2.imwrite(output_path, image*255)
             table.append(toc_ba-tic_ba)
             total_time+=toc_ba-tic_ba
 
@@ -332,14 +339,14 @@ class TrajectoryEstimator():
                 superpoint_features.get_length()))
             # save_feature_to_file(self._directory_name +
             #                      "debug/features/", superpoint_features, frame_count)
-            # save_feature_image(self._directory_name+"debug/feature_images/",
-            #                    superpoint_features, np.copy(color_image), frame_count)
+            save_feature_image(self._directory_name+"debug/feature_images/",
+                               superpoint_features, np.copy(color_image), frame_count)
             table.append(toc_ba-tic_ba)
             table.append(superpoint_features.get_length())
             total_time+=toc_ba-tic_ba
 
         #############################################################################
-        # 3 Landmark Backprojection.
+        # 3 Landmark Projection.
         #############################################################################
         tic_ba = time.time()
         observed_landmarks = self.landmark_projection(pre_pose)
@@ -350,12 +357,12 @@ class TrajectoryEstimator():
             print("No projected landmarks.")
             return Pose3(), False
         if self._debug:
-            print('Number of Back Projected Features:{}'.format(
+            print('Number of Projected Features:{}'.format(
                 observed_landmarks.get_length()))
             # save_feature_to_file(
             #     self._directory_name+"debug/project_features/", observed_landmarks, frame_count)
-            # save_feature_image(self._directory_name+"debug/project_feature_images/",
-            #                    observed_landmarks, np.copy(color_image), frame_count, color=(255, 0, 0))
+            save_feature_image(self._directory_name+"debug/project_feature_images/",
+                               observed_landmarks, np.copy(color_image), frame_count, color=(255, 0, 0))
             table.append(toc_ba-tic_ba)
             table.append(observed_landmarks.get_length())
             total_time+=toc_ba-tic_ba
@@ -375,12 +382,7 @@ class TrajectoryEstimator():
         if self._debug:
             print('Number of Matched Features:{}'.format(len(observations)))
 
-            def get_keypoints(observation):
-                landmark = np.array(
-                    [observation[1].x(), observation[1].y(), observation[1].z()])
-                index = np.where(observed_landmarks.landmarks == landmark)
-                return observed_landmarks.keypoint(int(index[0][0]))
-            keypoints = [get_keypoints(observation)
+            keypoints = [get_keypoints(observation, observed_landmarks)
                          for observation in observations]
             save_match_image(self._directory_name+"debug/match_images/",
                              observations, keypoints, np.copy(color_image), frame_count)
@@ -388,43 +390,39 @@ class TrajectoryEstimator():
             table.append(len(observations))
             total_time+=toc_ba-tic_ba
 
-        # If number of observations less than 12 pass
-        if len(observations) < 12:
-            print("Number of Observations less than 12.")
-            return Pose3(), False
-
         #############################################################################
         # 5 Point DLT RANSAC.
         #############################################################################
-        tic_ba = time.time()
-        observations, R, t = self.pnp_ransac(observations)
-        toc_ba = time.time()
-        print('PnP spents ', toc_ba-tic_ba, 's')
+        # # If number of observations less than 12 pass
+        # if len(observations) < 12:
+        #     print("Number of Observations less than 12.")
+        #     return Pose3(), False
 
-        # Check if to see if the associate landmarks is empty.
-        if self._debug:
-            print('Number of Filter Matched Features:{}'.format(len(observations)))
+        # tic_ba = time.time()
+        # observations, R, t = self.pnp_ransac(observations)
+        # toc_ba = time.time()
+        # print('PnP spents ', toc_ba-tic_ba, 's')
 
-            def get_keypoints(observation):
-                landmark = np.array(
-                    [observation[1].x(), observation[1].y(), observation[1].z()])
-                index = np.where(observed_landmarks.landmarks == landmark)
-                return observed_landmarks.keypoint(int(index[0][0]))
-            keypoints = [get_keypoints(observation)
-                         for observation in observations]
-            save_match_image(self._directory_name+"debug/filter_match_images/",
-                             observations, keypoints, np.copy(color_image), frame_count)
-            table.append(toc_ba-tic_ba)
-            table.append(len(observations))
-            total_time+=toc_ba-tic_ba
+        # # # Check if to see if the associate landmarks is empty.
+        # if self._debug:
+        #     print('Number of Filter Matched Features:{}'.format(len(observations)))
 
-        if len(observations) < 6:
-            print("Number of Observations less than 6.")
-            return Pose3(), False
+        #     keypoints = [get_keypoints(observation, observed_landmarks)
+        #                  for observation in observations]
+        #     save_match_image(self._directory_name+"debug/filter_match_images/",
+        #                      observations, keypoints, np.copy(color_image), frame_count)
+        #     # table.append(toc_ba-tic_ba)
+        #     # table.append(len(observations))
+        #     # total_time+=toc_ba-tic_ba
+
 
         ##############################################################################
         # 6 Bundle Adjustment.
         ##############################################################################
+        if len(observations) < 3:
+            print("Number of Observations less than 3.")
+            return Pose3(), False
+
         tic_ba = time.time()
         current_pose = self.BA_pose_estimation(observations, pre_pose)
         toc_ba = time.time()
@@ -434,15 +432,12 @@ class TrajectoryEstimator():
             print('Number of Matched Features:{}'.format(len(observations)))
             observed_landmarks = self.landmark_projection(current_pose)
 
-            def get_keypoints(observation):
-                landmark = np.array(
-                    [observation[1].x(), observation[1].y(), observation[1].z()])
-                index = np.where(observed_landmarks.landmarks == landmark)
-                return observed_landmarks.keypoint(int(index[0][0]))
-            keypoints = [get_keypoints(observation)
+            # Rearrange the keypoints list to have it match with the landmarks
+            keypoints = [get_keypoints(observation, observed_landmarks)
                          for observation in observations]
+            # project_keypoints = [kp for kp in observed_landmarks.keypoints]
             save_match_image(self._directory_name+"debug/final_project_images/",
-                             observations, keypoints, np.copy(color_image), frame_count)
+                             observations, keypoints, np.copy(color_image), frame_count, draw_line=True)
             table.append(toc_ba-tic_ba)
             total_time+=toc_ba-tic_ba
             table.append(total_time)

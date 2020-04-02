@@ -59,17 +59,19 @@ def save_feature_image(dir_name, features, color_image, index, color=(0, 255, 0)
     cv2.imwrite(out_file_1, color_image)
 
 
-def save_match_image(dir_name, observations, keypoints, color_image, index):
+def save_match_image(dir_name, observations, keypoints, color_image, index, draw_line = True):
     """Save image with extracted features and projected features on the image."""
     # Extra output -- Show current point detections.
     for i, observation in enumerate(observations):
         pt1 = (int(round(observation[0].x())), int(round(observation[0].y())))
         cv2.circle(color_image, pt1, 5, (0, 255, 0), -1, lineType=16)
-        pt2 = keypoints[i]
-        pt2 = (int(round(pt2[0])), int(round(pt2[1])))
-        cv2.circle(color_image, pt2, 2, (255, 0, 0), -1, lineType=16)
-        cv2.line(color_image, pt1, pt2, (0, 0, 0), 1)
-    cv2.putText(color_image, 'Green is extract features and Red is project features.',
+        if keypoints[i] != []:
+            pt2 = keypoints[i]
+            pt2 = (int(round(pt2[0])), int(round(pt2[1])))
+            cv2.circle(color_image, pt2, 2, (255, 0, 0), -1, lineType=16)
+            if draw_line:
+                cv2.line(color_image, pt1, pt2, (0, 0, 0), 1)
+    cv2.putText(color_image, 'Green is extract features and Blue is project features.',
                 FONT_PT, FONT, FONT_SC, FONT_CLR, lineType=16)
 
     if not os.path.exists(dir_name):
@@ -77,3 +79,16 @@ def save_match_image(dir_name, observations, keypoints, color_image, index):
     out_file = dir_name+'frame_%05d' % index+'.jpg'
     print('Writing image to %s' % out_file)
     cv2.imwrite(out_file, color_image)
+
+
+def get_keypoints(observation, observed_landmarks, thresh = 1e-8):
+    """Get match keypoints
+        observation: are the matched keypoints with the previous pose
+        observed_landmarks: is a the observed landmark object
+    """
+    landmark = np.array(
+        [observation[1].x(), observation[1].y(), observation[1].z()])
+    index = np.where(np.isclose(observed_landmarks.landmarks,landmark, thresh))
+    if len(index[0])<3:
+        return []
+    return observed_landmarks.keypoint(int(index[0][0]))
