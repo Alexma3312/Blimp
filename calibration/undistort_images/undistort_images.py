@@ -12,7 +12,7 @@ def undistort(basedir, img_extension, output_dir, output_prefix, calibration, di
     """A function to undistort the distorted images in a folder."""
     search = os.path.join(basedir, '*'+img_extension)
     img_paths = glob.glob(search)
-    img_paths.sort()
+    img_paths.sort(key=lambda f: int(''.join(filter(str.isdigit, f))))
     print("Number of Images: ", len(img_paths))
     maxlen = len(img_paths)
     if maxlen == 0:
