@@ -87,6 +87,35 @@ class TestTrajectoryEstimator(GtsamTestCase):
         np.testing.assert_equal(
             actual_observations.keypoints, expected_keypoints)
 
+    # @unittest.skip("test_landmark_projection")
+    def test_landmark_projection_matrix(self):
+        # create pose input
+        pose = Pose3(Rot3(1, 0, 0, 0, 0, 1, 0, -1, 0), Point3(0, 0, 0))
+        # Create member variables
+        # Three points, one good point, one bad cheirality point, and four out of field point
+        landmark_points = np.array(
+            [[0, 10, 0], [0, -10, 0], [320*15, 3000, 10]])
+        descriptors = np.ones((3, 256))
+        trajectory_estimator.map = LandmarkMap(landmark_points, descriptors)
+        fx = 200
+        fy = 200
+        u0 = 320
+        v0 = 240
+        #  width,height
+        image_size = (640, 480)
+        trajectory_estimator._camera = Camera(fx, fy, u0, v0, image_size)
+
+        # create estimate observations
+        expected_landmarks = np.array([[0, 10, 0]])
+        expected_keypoints = np.array([[320, 240]])
+
+        actual_observations = trajectory_estimator.landmark_projection_matrix(pose)
+        self.assertIsInstance(actual_observations, ObservedLandmarks)
+        np.testing.assert_equal(
+            actual_observations.landmarks, expected_landmarks)
+        np.testing.assert_equal(
+            actual_observations.keypoints, expected_keypoints)
+
     def find_keypoints_within_boundingbox(self):
         pass
 
