@@ -10,22 +10,24 @@ from localization.trajectory_estimator import TrajectoryEstimator
 from mapping.bundle_adjustment.mapping_result_helper import \
     load_poses_from_file
 from utilities.plotting import plot_trajectory_verification, plot_with_result, plot_trajectory
-from localization.configs.myconfig_raspi_96 import *
+from localization.configs.myconfig_raspi_inner import *
 from mapping.bundle_adjustment.mapping_result_helper import load_poses_from_file
 
 
 def run():
     """Execution."""
-    directory_name = "/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_972/"
+    directory_name = "/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_inner/"
     poses = load_poses_from_file(directory_name+'map/poses.dat')
-    initial_pose = poses[42]
+    # initial
+    initial_pose = poses[5]
+    # 999
+    # initial_pose = [1.766335876621073053e+00, 1.289008295837021367e-01, 1.211558428509138530e+00, 4.195097923857595834e-01, 2.670539063999178842e-01, 8.675792443166172596e-01, -2.274890890566308443e-01, 9.561762107651000653e-01, -1.843251700855094710e-01, -8.787833910882816291e-01, -1.200385981399861857e-01, 4.618771335581988713e-01]
 
-    # initial_pose = [2.792164465384178396e+00, 9.116142470170065515e-01, 4.049623263355763392e+00, -5.751420650057982309e-01, -3.414274125641775237e-01, -7.433968839123614725e-01, -2.805651311558865837e-02, 9.164367734706722057e-01, -3.991947799038351730e-01, 8.175722825124769333e-01, -2.087365856298510347e-01, -5.366606010197980670e-01]
     rotation = Rot3(np.array(initial_pose[3:]).reshape(3, 3))
     initial_pose = Pose3(rotation, Point3(np.array(initial_pose[0:3])))
 
-    l2_thresh = 0.6
-    distance_thresh = [30, 30]
+    l2_thresh = 1.2
+    distance_thresh = [60, 60]
     trajectory_estimator = TrajectoryEstimator(
         initial_pose, directory_name, camera, l2_thresh, distance_thresh, noise_models, True, True)
 
@@ -34,7 +36,7 @@ def run():
     start_index = 0
     img_glob = "*.jpg"
 
-    image_directory_path = directory_name+'source_images/'
+    image_directory_path = directory_name+'source_images_inner_10fps/'
     trajectory = trajectory_estimator.trajectory_generator(
         image_directory_path, camid, skip, img_glob, start_index)
 
