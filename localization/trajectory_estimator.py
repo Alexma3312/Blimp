@@ -309,6 +309,9 @@ class TrajectoryEstimator():
             
         # return the estimate current pose
         return result.atPose3(X(0)), idices[0]
+    
+    def image_registration(self):
+        pass
 
     def pose_estimator(self, image, frame_count, pre_pose, color_image):
         """The full pipeline to estimates the current pose."""
@@ -509,6 +512,13 @@ class TrajectoryEstimator():
             pre_pose = trajectory[-1]
             current_pose, status = self.pose_estimator(
                 frame, frame_count, pre_pose, color_image)
+
+            # TODO Shicong: Combine image registration with 
+            # if not pre_pose:
+            #     current_pose, status = self.image_registration(frame, frame_count, color_image)
+            # else:
+            #     current_pose, status = self.pose_estimator(frame, frame_count, pre_pose, color_image)
+
             if not status:
                 frame_count += 1
                 continue
