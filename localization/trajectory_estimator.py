@@ -244,8 +244,11 @@ class TrajectoryEstimator():
         # https://stackoverflow.com/questions/35650105/what-are-python-constants-for-cv2-solvepnp-method-flag
         # retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
         #     object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_DLS)
-        retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
-            object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_P3P)
+        try:
+            retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
+                object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_P3P)
+        except:
+            return observations, None, None
         rotation, _ = cv2.Rodrigues(rvecs)
         rotation = rotation.T
         translation = -np.dot(rotation.T, tvecs)
@@ -270,11 +273,15 @@ class TrajectoryEstimator():
         # Initialize factor graph
         graph = gtsam.NonlinearFactorGraph()
         initial_estimate = gtsam.Values()
+        factors=[]
+        errors = []
 
         for i, observation in enumerate(observations):
             # Add projection factors with matched feature points
-            graph.add(gtsam.GenericProjectionFactorCal3_S2(
-                observation[0], self._measurement_noise, X(0), P(i), self._camera.calibration))
+            factor = gtsam.GenericProjectionFactorCal3_S2(
+                observation[0], self._measurement_noise, X(0), P(i), self._camera.calibration)
+            graph.add(factor)
+            factors.append(factor)
             # Create priors for all observated landmark points
             graph.add(gtsam.PriorFactorPoint3(
                 P(i), observation[1], self._point_prior_noise))
@@ -293,8 +300,15 @@ class TrajectoryEstimator():
         params.setLinearSolverType("MULTIFRONTAL_QR")
         optimizer = gtsam.GaussNewtonOptimizer(graph, initial_estimate, params)
         result = optimizer.optimize()
-        current_pose = result.atPose3(X(0))
-        return current_pose
+        
+        for factor in factors:
+            error = factor.error(result)
+            errors.append(error)
+        # According to huber lost model, the threshold is K**(2)/2 to filter outliers
+        idices = np.where(np.array(errors)<(1.345**2/2))
+            
+        # return the estimate current pose
+        return result.atPose3(X(0)), idices[0]
 
     def pose_estimator(self, image, frame_count, pre_pose, color_image):
         """The full pipeline to estimates the current pose."""
@@ -393,7 +407,7 @@ class TrajectoryEstimator():
         #############################################################################
         # 5 Point DLT RANSAC.
         #############################################################################
-        # # If number of observations less than 12 pass
+        # If number of observations less than 12 pass
         # if len(observations) < 12:
         #     print("Number of Observations less than 12.")
         #     return Pose3(), False
@@ -424,13 +438,15 @@ class TrajectoryEstimator():
             return Pose3(), False
 
         tic_ba = time.time()
-        current_pose = self.BA_pose_estimation(observations, pre_pose)
+        current_pose, good_indices = self.BA_pose_estimation(observations, pre_pose)
         toc_ba = time.time()
         print('BA spents ', toc_ba-tic_ba, 's')
 
         if self._debug:
             print('Number of Matched Features:{}'.format(len(observations)))
+            # Robust noise model filter
             observed_landmarks = self.landmark_projection(current_pose)
+            observations = np.array(observations)[good_indices]
 
             # Rearrange the keypoints list to have it match with the landmarks
             keypoints = [get_keypoints(observation, observed_landmarks)
