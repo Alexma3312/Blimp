@@ -19,7 +19,8 @@ from gtsam import Point2, Point3, Pose3, Rot3, symbol
 from localization.features import Features
 from localization.landmark_map import LandmarkMap
 from localization.observed_landmarks import ObservedLandmarks
-from localization.trajectory_estimator_helper import (get_keypoints,
+from localization.trajectory_estimator_helper import (calculate_error,
+                                                      get_keypoints,
                                                       save_feature_image,
                                                       save_feature_to_file,
                                                       save_match_image)
@@ -273,7 +274,7 @@ class TrajectoryEstimator():
         # Initialize factor graph
         graph = gtsam.NonlinearFactorGraph()
         initial_estimate = gtsam.Values()
-        factors=[]
+        factors = []
         errors = []
 
         for i, observation in enumerate(observations):
@@ -300,19 +301,22 @@ class TrajectoryEstimator():
         params.setLinearSolverType("MULTIFRONTAL_QR")
         optimizer = gtsam.GaussNewtonOptimizer(graph, initial_estimate, params)
         result = optimizer.optimize()
-        
+
         for factor in factors:
             error = factor.error(result)
             errors.append(error)
         # According to huber lost model, the threshold is K**(2)/2 to filter outliers
-        idices = np.where(np.array(errors)<(1.345**2/2))
-            
+        idices = np.where(np.array(errors) < (1.345**2/2))
+
         # return the estimate current pose
         return result.atPose3(X(0)), idices[0]
 
+    def image_registration(self):
+        pass
+
     def pose_estimator(self, image, frame_count, pre_pose, color_image):
         """The full pipeline to estimates the current pose."""
-        
+
         #############################################################################
         # 0 Create debug folder
         #############################################################################
@@ -320,22 +324,24 @@ class TrajectoryEstimator():
         #     os.mkdir(self._directory_name+"debug/")
         table = [frame_count]
         total_time = 0.0
-        
+
         #############################################################################
         # 1 Image undistort.
         #############################################################################
         tic_ba = time.time()
-        image = cv2.undistort(image, self._camera.calibration.matrix(), self._camera.distortion)
+        image = cv2.undistort(
+            image, self._camera.calibration.matrix(), self._camera.distortion)
         toc_ba = time.time()
         print('Undistort spents ', toc_ba-tic_ba, 's')
         if self._debug:
-            color_image = cv2.undistort(color_image, self._camera.calibration.matrix(), self._camera.distortion)
+            color_image = cv2.undistort(
+                color_image, self._camera.calibration.matrix(), self._camera.distortion)
             # if not os.path.exists(self._directory_name+"debug/undistort_images/"):
             #     os.mkdir(self._directory_name+"debug/undistort_images/")
             # output_path = self._directory_name+'debug/undistort_images/frame_%d' % frame_count+'.jpg'
             # cv2.imwrite(output_path, image*255)
             table.append(toc_ba-tic_ba)
-            total_time+=toc_ba-tic_ba
+            total_time += toc_ba-tic_ba
 
         #############################################################################
         # 2 Superpoint Feature Extraction.
@@ -357,7 +363,7 @@ class TrajectoryEstimator():
                                superpoint_features, np.copy(color_image), frame_count)
             table.append(toc_ba-tic_ba)
             table.append(superpoint_features.get_length())
-            total_time+=toc_ba-tic_ba
+            total_time += toc_ba-tic_ba
 
         #############################################################################
         # 3 Landmark Projection.
@@ -379,7 +385,7 @@ class TrajectoryEstimator():
                                observed_landmarks, np.copy(color_image), frame_count, color=(255, 0, 0))
             table.append(toc_ba-tic_ba)
             table.append(observed_landmarks.get_length())
-            total_time+=toc_ba-tic_ba
+            total_time += toc_ba-tic_ba
 
         #############################################################################
         # 4 Landmark Association.
@@ -402,7 +408,7 @@ class TrajectoryEstimator():
                              observations, keypoints, np.copy(color_image), frame_count)
             table.append(toc_ba-tic_ba)
             table.append(len(observations))
-            total_time+=toc_ba-tic_ba
+            total_time += toc_ba-tic_ba
 
         #############################################################################
         # 5 Point DLT RANSAC.
@@ -429,7 +435,6 @@ class TrajectoryEstimator():
         #     # table.append(len(observations))
         #     # total_time+=toc_ba-tic_ba
 
-
         ##############################################################################
         # 6 Bundle Adjustment.
         ##############################################################################
@@ -438,7 +443,8 @@ class TrajectoryEstimator():
             return Pose3(), False
 
         tic_ba = time.time()
-        current_pose, good_indices = self.BA_pose_estimation(observations, pre_pose)
+        current_pose, good_indices = self.BA_pose_estimation(
+            observations, pre_pose)
         toc_ba = time.time()
         print('BA spents ', toc_ba-tic_ba, 's')
 
@@ -454,8 +460,10 @@ class TrajectoryEstimator():
             # project_keypoints = [kp for kp in observed_landmarks.keypoints]
             save_match_image(self._directory_name+"debug/final_project_images/",
                              observations, keypoints, np.copy(color_image), frame_count, draw_line=True)
+            error = calculate_error(observations, keypoints)
+            table.append(error)
             table.append(toc_ba-tic_ba)
-            total_time+=toc_ba-tic_ba
+            total_time += toc_ba-tic_ba
             table.append(total_time)
 
         ##############################################################################
@@ -490,7 +498,7 @@ class TrajectoryEstimator():
         # Display the trajectory
         fig = plt.figure(figsize=(10, 4))
         ax1 = fig.add_subplot(1, 1, 1, projection='3d')
-        
+
         # ax2 = fig.add_subplot(1, 2, 2) # diplay the current detected image
         # plot_map_ax(self.map.landmarks, ax1) # display the map
         plt.show(block=False)
@@ -509,6 +517,13 @@ class TrajectoryEstimator():
             pre_pose = trajectory[-1]
             current_pose, status = self.pose_estimator(
                 frame, frame_count, pre_pose, color_image)
+
+            # TODO Shicong: Combine image registration with
+            # if not pre_pose:
+            #     current_pose, status = self.image_registration(frame, frame_count, color_image)
+            # else:
+            #     current_pose, status = self.pose_estimator(frame, frame_count, pre_pose, color_image)
+
             if not status:
                 frame_count += 1
                 continue
@@ -520,7 +535,7 @@ class TrajectoryEstimator():
                 with open(self._directory_name+"debug/poses.dat", "a") as myfile:
                     myfile.write(str(frame_count)+" ")
                     np.savetxt(myfile, [[t[0], t[1], t[2], r[0][0], r[0][1], r[0]
-                                    [2], r[1][0], r[1][1], r[1][2], r[2][0], r[2][1], r[2][2]]])
+                                         [2], r[1][0], r[1][1], r[1][2], r[2][0], r[2][1], r[2][2]]])
 
             if self._visualize is True:
                 # ax2.imshow(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))

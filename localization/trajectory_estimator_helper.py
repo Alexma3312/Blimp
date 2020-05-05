@@ -58,6 +58,18 @@ def save_feature_image(dir_name, features, color_image, index, color=(0, 255, 0)
     print('Writing image to %s' % out_file_1)
     cv2.imwrite(out_file_1, color_image)
 
+def calculate_error(observations, keypoints):
+    """Calculate the pose estimation error. For each pose, the error is the distance between the project landmark and the keypoint."""
+    error = 0
+    counter = 0
+    for i, observation in enumerate(observations):
+        pt1 = np.array((int(round(observation[0].x())), int(round(observation[0].y()))))
+        if keypoints[i] != []:
+            pt2 = keypoints[i]
+            pt2 = np.array((int(round(pt2[0])), int(round(pt2[1]))))
+            error+= np.linalg.norm(pt1-pt2)
+            counter+=1
+    return float(error/counter)
 
 def save_match_image(dir_name, observations, keypoints, color_image, index, draw_line = True):
     """Save image with extracted features and projected features on the image."""
