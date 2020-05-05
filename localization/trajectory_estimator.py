@@ -25,8 +25,13 @@ from localization.trajectory_estimator_helper import (calculate_error,
                                                       save_feature_image,
                                                       save_feature_to_file,
                                                       save_match_image)
+from mapping.bundle_adjustment.mapping_result_helper import load_map_from_file
+from SuperPointPretrainedNetwork.demo_superpoint import SuperPointFrontend
+from utilities.plotting import (plot_map, plot_map_ax, plot_trajectory,
+                                plot_trajectory_ax)
+from utilities.video_streamer import VideoStreamer
 
-ler()
+profile = LineProfiler()
 atexit.register(profile.print_stats)
 
 
@@ -95,7 +100,7 @@ class TrajectoryEstimator():
         """Check to see if the next frame is a bad frame."""
         # A bad frame has an entropy value less than 7.
         entropy = skimage.measure.shannon_entropy(next_frame)
-        return entropy < 7.0
+        return entropy<7.0
 
     def superpoint_generator(self, image):
         """Use superpoint to extract features in the image
