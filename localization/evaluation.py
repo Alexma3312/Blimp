@@ -8,7 +8,7 @@ from utilities.plotting import plot_trajectory
 from tabulate import tabulate
 
 # evaluation_directory = '/home/sma96/datasets/spring2020/raspi/kluas/localization/results/96_10fps_result'
-evaluation_directory = '/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_face_inside/debug'
+evaluation_directory = '/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_inner/debug'
 pose_file = evaluation_directory+'/poses.dat'
 table_file = evaluation_directory+'/table.dat'
 
@@ -41,6 +41,7 @@ project_time = []
 project_number = []
 associate_time = [] 
 match_number = []
+pose_error = []
 pose_estimation_time = []
 total_time = []
 for idx in range(number_poses):
@@ -53,8 +54,9 @@ for idx in range(number_poses):
     project_number.append(data[5])
     associate_time.append(data[6])
     match_number.append(data[7])
-    pose_estimation_time.append(data[8])
-    total_time.append(data[9])
+    pose_error.append(data[8])
+    pose_estimation_time.append(data[9])
+    total_time.append(data[10])
 
 # generate table
 average_undistort_time = sum(undistort_time)/number_poses
@@ -78,6 +80,10 @@ average_match_number = sum(match_number)/number_poses
 max_match_number = max(match_number)
 min_match_number = min(match_number)
 
+average_pose_error = sum(pose_error)/number_poses
+max_pose_error = max(pose_error)
+min_pose_error = min(pose_error)
+
 table.append(['average_undistort_time',average_undistort_time])
 table.append(['average_superpoint_time',average_superpoint_time])
 table.append(['average_project_time',average_project_time])
@@ -95,6 +101,9 @@ table.append(['min_project_number',min_project_number])
 table.append(['average_match_number',average_match_number])
 table.append(['max_match_number',max_match_number])
 table.append(['min_match_number',min_match_number])
+table.append(['average_pose_error',average_pose_error])
+table.append(['max_pose_error',max_pose_error])
+table.append(['min_pose_error',min_pose_error])
 
 # sort by error and print as github
 # table.sort(key=lambda row: row[-1])
