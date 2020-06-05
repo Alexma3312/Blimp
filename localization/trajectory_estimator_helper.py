@@ -69,6 +69,8 @@ def calculate_error(observations, keypoints):
             pt2 = np.array((int(round(pt2[0])), int(round(pt2[1]))))
             error+= np.linalg.norm(pt1-pt2)
             counter+=1
+    if counter == 0:
+        return -1.0
     return float(error/counter)
 
 def save_match_image(dir_name, observations, keypoints, color_image, index, draw_line = True):
