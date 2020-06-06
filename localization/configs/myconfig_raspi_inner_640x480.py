@@ -27,8 +27,8 @@ k2 = -0.260489
 p1 = -0.000013
 p2 = -0.002028
 p3 = 0.000000
-calibration_matrix = Cal3_S2(fx=fx/2, fy=fy/2, s=s,
-                             u0=u0/2, v0=v0/2)
+calibration_matrix = Cal3_S2(fx=fx, fy=fy, s=s,
+                             u0=u0, v0=v0)
 distortion = np.array([k1, k2, p1, p2, p3])
-image_size = (int(640/2), int(480/2))
+image_size = (int(640), int(480))
 camera = Camera(calibration_matrix, distortion, image_size)

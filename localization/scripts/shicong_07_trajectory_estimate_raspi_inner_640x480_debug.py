@@ -10,20 +10,18 @@ from localization.trajectory_estimator import TrajectoryEstimator
 from mapping.bundle_adjustment.mapping_result_helper import \
     load_poses_from_file
 from utilities.plotting import plot_trajectory_verification, plot_with_result, plot_trajectory
-from localization.configs.myconfig_raspi_inner_degenerate import *
+from localization.configs.myconfig_raspi_inner_640x480_debug import *
 from mapping.bundle_adjustment.mapping_result_helper import load_poses_from_file
 
 
 def run():
     """Execution."""
-    directory_name = "/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_inner_degenerate/"
-    poses = load_poses_from_file(directory_name+'map/poses.dat')
-    # 1000
-    initial_pose = [1.902099991905188414e+00, 1.656925538968248568e-01, 1.130714771245433736e+00, 3.001053052505483487e-01, 3.000391073325772706e-01, 9.054906624761668299e-01, -3.209157043353065286e-01, 9.256710093625487579e-01, -2.003653990505089855e-01, -8.983039109741298711e-01, -2.304554544738816602e-01, 3.740860422841008615e-01]
+    directory_name = "/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_inner_137_640x480_debug/"
+    initial_pose = [2.164672324258367642e+00, 3.617913771486168106e-01, 6.587822888340479910e-01, 2.654563354459119617e-01, 1.679378914304812953e-01, 9.493839047474442738e-01, -2.910942407853995828e-01, 9.527180172760190136e-01, -8.713508213820830850e-02, -9.191284333286540154e-01, -2.532296273731479697e-01, 3.017907865844448589e-01]
     rotation = Rot3(np.array(initial_pose[3:]).reshape(3, 3))
     initial_pose = Pose3(rotation, Point3(np.array(initial_pose[0:3])))
 
-    l2_thresh = 1.0
+    l2_thresh = 1.2
     distance_thresh = [30, 30]
     trajectory_estimator = TrajectoryEstimator(
         initial_pose, directory_name, camera, l2_thresh, distance_thresh, noise_models, True, True)
