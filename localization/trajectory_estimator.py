@@ -85,7 +85,7 @@ class TrajectoryEstimator():
         self._point_prior_noise = noise_models[1]
         self._pose_translation_prior_noise = noise_models[2]
         self._fe = fe = SuperPointFrontend(weights_path="SuperPointPretrainedNetwork/superpoint_v1.pth",
-                                           nms_dist=16,
+                                           nms_dist=4,
                                            conf_thresh=0.015,
                                            nn_thresh=0.7,
                                            cuda=True)
@@ -136,8 +136,8 @@ class TrajectoryEstimator():
         homogenous_keypoints = calibration @ cPw @ homogenous_map
 
         keypoints = homogenous_keypoints[:2, :]/homogenous_keypoints[2, :]
-        check = np.where((keypoints[0, :] >= 0) & (keypoints[0, :] < width) & (
-            keypoints[1, :] >= 0) & (keypoints[1, :] < height) & (homogenous_keypoints[2, :] > 0))
+        check = np.where((keypoints[0, :] >= (0-self.x_distance_thresh)) & (keypoints[0, :] < (width+self.x_distance_thresh)) & (
+            keypoints[1, :] >= (0-self.y_distance_thresh)) & (keypoints[1, :] < (height+self.y_distance_thresh)) & (homogenous_keypoints[2, :] > 0))
 
         observed_landmarks = ObservedLandmarks()
         observed_landmarks.keypoints = keypoints.T[check]
@@ -245,23 +245,23 @@ class TrajectoryEstimator():
                 (object_points, [observation[1].x(), observation[1].y(), observation[1].z()]))
 
         # https://stackoverflow.com/questions/35650105/what-are-python-constants-for-cv2-solvepnp-method-flag
+        # https://docs.opencv.org/3.4/d9/d0c/group__calib3d.html#ga549c2075fac14829ff4a58bc931c033d
         # retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
         #     object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_DLS)
         try:
             retval, rvecs, tvecs, inliers = cv2.solvePnPRansac(
-                object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_P3P)
+                object_points, image_points, self._camera.calibration.matrix(), None, None, None, False, cv2.SOLVEPNP_AP3P)
         except:
-            return observations, None, None
+            return observations, None
         rotation, _ = cv2.Rodrigues(rvecs)
-        rotation = rotation.T
-        translation = -np.dot(rotation.T, tvecs)
-
-        if inliers is None or inliers.shape[0] < 0.5*len(observations):
-            return [], None, None
+        estimate_pose = Pose3(Rot3(rotation.reshape(3, 3)), Point3(tvecs.reshape(3,)))
+        estimate_pose = estimate_pose.inverse()
+        if inliers is None: #or inliers.shape[0] < 0.5*len(observations):
+            return [], None
         # Filter observations
-        return [observations[int(index)-1] for index in inliers], rotation, translation
+        return [observations[int(index)-1] for index in inliers], estimate_pose
 
-    def BA_pose_estimation(self, observations, previous_pose):
+    def BA_pose_estimation(self, observations, estimate_pose):
         """ Estimate current pose with matched features through GTSAM Bundle Adjustment.
         Parameters:
             observations - [[Point2(), Point3()]]
@@ -269,7 +269,6 @@ class TrajectoryEstimator():
         Returns:
             current_pose - gtsam.pose3 Object. The current calculated pose.
         """
-        # observations, R, t = self.pnp_ransac(observations)
         # Need to consider the situation when the number of observation is not enough.
         assert observations, "The observation is empty."
 
@@ -290,12 +289,10 @@ class TrajectoryEstimator():
                 P(i), observation[1], self._point_prior_noise))
             initial_estimate.insert(P(i), observation[1])
         # Create initial estimate for the pose
-        # initial_estimate.insert(X(0), Pose3(
-        #     Rot3(R.reshape(3, 3)), Point3(t.reshape(3,))))
-        initial_estimate.insert(X(0), previous_pose)
-        # TODO: Shicong, Add a prior factor by using the previous pose
-        graph.add(gtsam.PoseTranslationPrior3D(
-            X(0), previous_pose, self._pose_translation_prior_noise))
+        initial_estimate.insert(X(0), estimate_pose)
+        # Add a prior factor by using the previous pose
+        # graph.add(gtsam.PoseTranslationPrior3D(
+        #     X(0), estimate_pose, self._pose_translation_prior_noise))
 
         # Optimization
         # optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
@@ -310,8 +307,11 @@ class TrajectoryEstimator():
         # According to huber lost model, the threshold is K**(2)/2 to filter outliers
         idices = np.where(np.array(errors) < (1.345**2/2))
 
+        # if idices[0].shape[0] < 4 or idices[0].shape[0] < 0.5*len(observations):
+        # if idices[0].shape[0] < 15:
+        #     return Pose3(), idices[0], None
         # return the estimate current pose
-        return result.atPose3(X(0)), idices[0]
+        return result.atPose3(X(0)), idices[0], True
 
     def image_registration(self):
         pass
@@ -421,7 +421,7 @@ class TrajectoryEstimator():
         #     return Pose3(), False
 
         # tic_ba = time.time()
-        # observations, R, t = self.pnp_ransac(observations)
+        # observations, pnp_pose = self.pnp_ransac(observations)
         # toc_ba = time.time()
         # print('PnP spents ', toc_ba-tic_ba, 's')
 
@@ -433,9 +433,9 @@ class TrajectoryEstimator():
         #                  for observation in observations]
         #     save_match_image(self._directory_name+"debug/filter_match_images/",
         #                      observations, keypoints, np.copy(color_image), frame_count)
-        #     # table.append(toc_ba-tic_ba)
-        #     # table.append(len(observations))
-        #     # total_time+=toc_ba-tic_ba
+        #     table.append(toc_ba-tic_ba)
+        #     table.append(len(observations))
+        #     total_time+=toc_ba-tic_ba
 
         ##############################################################################
         # 6 Bundle Adjustment.
@@ -445,10 +445,19 @@ class TrajectoryEstimator():
             return Pose3(), False
 
         tic_ba = time.time()
-        current_pose, good_indices = self.BA_pose_estimation(
-            observations, pre_pose)
+        # if pnp_pose == None:
+        #     estimate_pose = pre_pose
+        # else:
+        #     estimate_pose = pnp_pose
+        estimate_pose = pre_pose
+        current_pose, good_indices, flag = self.BA_pose_estimation(
+            observations, estimate_pose)
         toc_ba = time.time()
         print('BA spents ', toc_ba-tic_ba, 's')
+        # Check if to see if there are not enough good factors.
+        if not flag:
+            print("No enough good factors.")
+            return Pose3(), False
 
         if self._debug:
             print('Number of Matched Features:{}'.format(len(observations)))
