@@ -5,7 +5,7 @@ from gtsam import Cal3_S2
 import numpy as np
 
 
-measurement_noise_sigma = 1.0
+measurement_noise_sigma = 5.0
 measurement_noise = gtsam.noiseModel_Robust(gtsam.noiseModel_mEstimator_Huber(
     1.345), gtsam.noiseModel_Isotropic.Sigma(2, measurement_noise_sigma))
 

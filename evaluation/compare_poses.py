@@ -1,0 +1,16 @@
+from gtsam import Rot3, Pose3, Point3
+from evaluation.utils import angle,difference
+import numpy as np
+
+initial_pose = [6.504655082965937751e-03, -4.429935829998826735e-01, -1.548319940433558584e+00, 9.456821730413385030e-01, -2.282751653208554554e-01, -2.314642013131800180e-01, 2.522973866558720357e-01, 9.643597700242152460e-01, 7.972617290112769817e-02, 2.050152586478128924e-01, -1.337934335331118774e-01, 9.695710705590341316e-01]
+rotation = Rot3(np.array(initial_pose[3:]).reshape(3, 3))
+initial_pose = Pose3(rotation, Point3(np.array(initial_pose[0:3])))
+
+new_pose = [2.704002030642885940e-02, -4.432683156289973225e-01, -1.570991648315343658e+00, 9.452853900752532512e-01, -2.270703183670336467e-01, -2.342532856268428054e-01, 2.515582729161801590e-01, 9.645155429015946913e-01, 8.017607391654302251e-02, 2.077353283332083744e-01, -1.347176232641308646e-01, 9.688638683243163685e-01]
+rotation = Rot3(np.array(new_pose[3:]).reshape(3, 3))
+new_pose = Pose3(rotation, Point3(np.array(new_pose[0:3])))
+
+angle = angle(initial_pose.rotation(), new_pose.rotation())
+print(angle)
+distance = difference(initial_pose, new_pose)
+print(distance)

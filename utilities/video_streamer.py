@@ -125,6 +125,7 @@ class VideoStreamer():
             input_image = cv2.cvtColor(color_image, cv2.COLOR_RGB2GRAY)
             input_image = (input_image.astype('float32') / 255.)
 
+
             # input_image = self.read_image(image_file, self.sizer)
             # color_image = cv2.imread(image_file)
         # Increment internal counter.

@@ -7,16 +7,17 @@ import os
 import time
 
 import cv2
+import gtsam
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 import skimage.measure
+from gtsam import Point2, Point3, Pose3, Rot3, symbol
 from line_profiler import LineProfiler
 from sklearn.metrics import pairwise_distances_argmin_min
 from sklearn.neighbors import NearestNeighbors
 
-import gtsam
-from gtsam import Point2, Point3, Pose3, Rot3, symbol
+from evaluation.utils import difference
 from localization.features import Features
 from localization.landmark_map import LandmarkMap
 from localization.observed_landmarks import ObservedLandmarks
@@ -58,7 +59,7 @@ class TrajectoryEstimator():
         noise models:
     """
 
-    def __init__(self, initial_pose, directory_name, camera, l2_threshold, distance_thresh, noise_models, visualize_enable=True, debug_enable=False):
+    def __init__(self, initial_pose, directory_name, camera, l2_threshold, distance_thresh, noise_models, visualize_enable=True, debug_enable=False, descriptor="Superpoint", motion_model="static", dift_threshold=[10, 60]):
         self.initial_pose = initial_pose
         self._directory_name = directory_name
 
@@ -83,12 +84,16 @@ class TrajectoryEstimator():
         self._debug = debug_enable
         self._measurement_noise = noise_models[0]
         self._point_prior_noise = noise_models[1]
-        self._pose_translation_prior_noise = noise_models[2]
-        self._fe = fe = SuperPointFrontend(weights_path="SuperPointPretrainedNetwork/superpoint_v1.pth",
-                                           nms_dist=4,
-                                           conf_thresh=0.015,
-                                           nn_thresh=0.7,
-                                           cuda=True)
+        self._pose_prior_noise = noise_models[2]
+        self._fe = SuperPointFrontend(weights_path="SuperPointPretrainedNetwork/superpoint_v1.pth",
+                                      nms_dist=12,
+                                      conf_thresh=0.015,
+                                      nn_thresh=0.7,
+                                      cuda=True)
+        self.sift = cv2.xfeatures2d.SIFT_create()
+        self.descriptor = descriptor
+        self.motion_model = motion_model
+        self.dift_threshold = dift_threshold
 
     def load_map(self, landmarks):
         """Load map data
@@ -100,7 +105,7 @@ class TrajectoryEstimator():
         """Check to see if the next frame is a bad frame."""
         # A bad frame has an entropy value less than 7.
         entropy = skimage.measure.shannon_entropy(next_frame)
-        return entropy<7.0
+        return entropy < 7.0
 
     def superpoint_generator(self, image):
         """Use superpoint to extract features in the image
@@ -112,6 +117,29 @@ class TrajectoryEstimator():
         superpoints, descriptors, _ = self._fe.run(image)
 
         return Features(superpoints[:2, ].T, descriptors.T)
+
+    def rootsift_generator(self, image):
+        """Use sift to extract features in the image
+        Arguments:
+            image: array
+        Returns:
+            sift_features: an *Features* Object
+        """
+        image = (image*255).astype('uint8')
+        keypoints, descriptors = self.sift.detectAndCompute(image, None)
+
+        # frame = cv2.drawKeypoints(image, keypoints, np.array([]), (0, 0, 255), cv2.DRAW_MATCHES_FLAGS_DRAW_RICH_KEYPOINTS)
+        # cv2.imshow('frame', frame), cv2.waitKey()
+
+        keypoints_ = []
+        for keypoint in keypoints:
+            keypoints_.append([keypoint.pt[0], keypoint.pt[1]])
+
+        descriptors /= (descriptors.sum(axis=0, keepdims=True)+1e-7)
+        descriptors = np.sqrt(descriptors)
+        keypoints_ = np.array(keypoints_)
+
+        return Features(keypoints_, descriptors)
 
     def landmark_projection(self, pose):
         """ Project landmark points in the map to the given camera pose.
@@ -254,9 +282,10 @@ class TrajectoryEstimator():
         except:
             return observations, None
         rotation, _ = cv2.Rodrigues(rvecs)
-        estimate_pose = Pose3(Rot3(rotation.reshape(3, 3)), Point3(tvecs.reshape(3,)))
+        estimate_pose = Pose3(Rot3(rotation.reshape(3, 3)),
+                              Point3(tvecs.reshape(3,)))
         estimate_pose = estimate_pose.inverse()
-        if inliers is None: #or inliers.shape[0] < 0.5*len(observations):
+        if inliers is None:  # or inliers.shape[0] < 0.5*len(observations):
             return [], None
         # Filter observations
         return [observations[int(index)-1] for index in inliers], estimate_pose
@@ -290,9 +319,10 @@ class TrajectoryEstimator():
             initial_estimate.insert(P(i), observation[1])
         # Create initial estimate for the pose
         initial_estimate.insert(X(0), estimate_pose)
-        # Add a prior factor by using the previous pose
+        # Add a prior factor by using the estimate pose
         # graph.add(gtsam.PoseTranslationPrior3D(
-        #     X(0), estimate_pose, self._pose_translation_prior_noise))
+        #     X(0), estimate_pose, self._pose_prior_noise))
+        graph.add(gtsam.PriorFactorPose3(X(0), estimate_pose, self._pose_prior_noise))
 
         # Optimization
         # optimizer = gtsam.LevenbergMarquardtOptimizer(graph, initial_estimate)
@@ -312,9 +342,6 @@ class TrajectoryEstimator():
         #     return Pose3(), idices[0], None
         # return the estimate current pose
         return result.atPose3(X(0)), idices[0], True
-
-    def image_registration(self):
-        pass
 
     def pose_estimator(self, image, frame_count, pre_pose, color_image):
         """The full pipeline to estimates the current pose."""
@@ -349,7 +376,10 @@ class TrajectoryEstimator():
         # 2 Superpoint Feature Extraction.
         #############################################################################
         tic_ba = time.time()
-        superpoint_features = self.superpoint_generator(image)
+        if self.descriptor == "Superpoint":
+            superpoint_features = self.superpoint_generator(image)
+        if self.descriptor == "Sift":
+            superpoint_features = self.rootsift_generator(image)
         toc_ba = time.time()
         print('Superpoint Extraction spents ', toc_ba-tic_ba, 's')
         # Check if to see if features are empty.
@@ -486,6 +516,28 @@ class TrajectoryEstimator():
 
         return current_pose, True
 
+    def constant_speed(self, trajectory, counter):
+        """Use constant speed model to estimate current pose."""
+        assert len(trajectory)>=2, "Trajectory has to have at least 2 elements to use constant speed model."
+        pre_pose = trajectory[-1]
+        pre_pre_pose = trajectory[-2]
+        T = pre_pre_pose.between(pre_pose)
+        estimate_pose = pre_pose 
+        for i in range(counter+1):
+            estimate_pose = estimate_pose.compose(T)
+            R = estimate_pose.rotation()
+            R = Rot3.ClosestTo(R.matrix())
+            estimate_pose = Pose3(R, estimate_pose.translation())
+        return estimate_pose
+
+    def check_current_pose(self, current_pose, pre_pose, status, dift_threshold):
+        """Set the pose estimation status by checking the difference between current pose and previous pose"""
+        distance, angle = difference(current_pose, pre_pose)
+        print(distance, angle)
+        if distance>dift_threshold[0] or angle>dift_threshold[1]:
+            status = False
+        return status
+
     def trajectory_generator(self, input_src, camid, skip, img_glob, start_index):
         """The top level function, use to generate trajectory.
         Input:
@@ -516,30 +568,34 @@ class TrajectoryEstimator():
 
         # Help to index the input image
         frame_count = 0
+        bad_frame_count = 0
         while True:
             # Get a new image.
             frame, color_image, status = vs.next_frame()
             if status is False:
                 break
 
-            if self.detect_bad_frame(frame):
-                continue
+            # if self.detect_bad_frame(frame):
+            #     continue
 
             # Get the previous pose
-            pre_pose = trajectory[-1]
+            if self.motion_model == "constant" and len(trajectory)>=2:
+                estimate_pose = self.constant_speed(trajectory, bad_frame_count)
+            if self.motion_model == "static" or len(trajectory)<2:
+                estimate_pose = trajectory[-1]
             current_pose, status = self.pose_estimator(
-                frame, frame_count, pre_pose, color_image)
+                frame, frame_count, estimate_pose, color_image)
 
-            # TODO Shicong: Combine image registration with
-            # if not pre_pose:
-            #     current_pose, status = self.image_registration(frame, frame_count, color_image)
-            # else:
-            #     current_pose, status = self.pose_estimator(frame, frame_count, pre_pose, color_image)
+            # if bad_frame_count == 0:
+            #     status = self.check_current_pose(
+            #         current_pose, trajectory[-1], status, self.dift_threshold)
 
             if not status:
                 frame_count += 1
+                bad_frame_count += 1
                 continue
 
+            bad_frame_count = 0
             trajectory.append(current_pose)
             if self._debug:
                 r = current_pose.rotation().matrix()
@@ -551,7 +607,7 @@ class TrajectoryEstimator():
 
             if self._visualize is True:
                 # ax2.imshow(cv2.cvtColor(color_image, cv2.COLOR_BGR2RGB))
-                plot_trajectory_ax(trajectory[-5:], ax1)
+                plot_trajectory_ax([trajectory[-1]], ax1)
 
                 plt.show(block=False)
 

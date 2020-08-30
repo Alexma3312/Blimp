@@ -24,10 +24,14 @@ def run():
     rotation = Rot3(np.array(initial_pose[3:]).reshape(3, 3))
     initial_pose = Pose3(rotation, Point3(np.array(initial_pose[0:3])))
 
-    l2_thresh = 1.2
-    distance_thresh = [60, 60]
+    l2_thresh = 1.0
+    distance_thresh = [30, 30]
+    motion_model = "constant"
+    # dift_threshold = [1000,360]
+    # motion_model = "static"
+    dift_threshold = [0.1,5]
     trajectory_estimator = TrajectoryEstimator(
-        initial_pose, directory_name, camera, l2_thresh, distance_thresh, noise_models, True, True)
+        initial_pose, directory_name, camera, l2_thresh, distance_thresh, noise_models, True, True,motion_model=motion_model,dift_threshold=dift_threshold)
 
     camid = 1
     skip = 1

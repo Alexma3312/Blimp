@@ -4,16 +4,17 @@ Unit tests for trajectory estimator.
 """
 # pylint: disable=no-name-in-module
 
+import math
 import unittest
 
 import cv2
+import gtsam
 import numpy as np
+from gtsam import Cal3_S2, PinholeCameraCal3_S2, Point2, Point3, Pose3, Rot3
+from gtsam.utils.test_case import GtsamTestCase
 from mock import patch
 from sklearn.neighbors import NearestNeighbors, RadiusNeighborsClassifier
 
-import gtsam
-from gtsam import Cal3_S2, PinholeCameraCal3_S2, Point2, Point3, Pose3, Rot3
-from gtsam.utils.test_case import GtsamTestCase
 from localization.camera import Camera
 from localization.features import Features
 from localization.landmark_map import LandmarkMap
@@ -309,6 +310,45 @@ class TestTrajectoryEstimator(GtsamTestCase):
         indices = indices[0].tolist()
         np.testing.assert_equal(indices, [1, 2, 3])
 
+    def test_constant_speed(self):
+        """test constant speed"""
+        pose1 = Pose3()
+        pose2 = Pose3(Rot3.Ry(math.radians(180)), Point3(1,2,3))
+        trajectory = [pose1, pose2]
+        counter = 0
+        expected_pose = Pose3(Rot3(),Point3(0,4,0))
+        estiamte_pose = trajectory_estimator.constant_speed(trajectory, counter)
+        self.gtsamAssertEquals(estiamte_pose,expected_pose)
+        counter = 2
+        expected_pose = Pose3(Rot3(),Point3(-2,8,-6))
+        estiamte_pose = trajectory_estimator.constant_speed(trajectory, counter)
+        pass
+
+    def test_check_current_pose(self):
+        """test check current pose"""
+        current_pose = Pose3()
+        pre_pose = Pose3(Rot3.Ry(math.radians(30)), Point3(1,0,0))
+        status = True 
+        dift_threshold = [2,30]
+        actual_status = trajectory_estimator.check_current_pose(current_pose, pre_pose, status, dift_threshold)
+        expected_status = True
+        self.assertEqual(actual_status,expected_status)
+
+        current_pose = Pose3()
+        pre_pose = Pose3(Rot3.Ry(math.radians(40)), Point3(1,0,0))
+        status = True 
+        dift_threshold = [2,30]
+        actual_status = trajectory_estimator.check_current_pose(current_pose, pre_pose, status, dift_threshold)
+        expected_status = False
+        self.assertEqual(actual_status,expected_status)
+
+        current_pose = Pose3()
+        pre_pose = Pose3(Rot3.Ry(math.radians(30)), Point3(3,0,0))
+        status = True 
+        dift_threshold = [2,30]
+        actual_status = trajectory_estimator.check_current_pose(current_pose, pre_pose, status, dift_threshold)
+        expected_status = False
+        self.assertEqual(actual_status,expected_status)
 
 if __name__ == "__main__":
     unittest.main()

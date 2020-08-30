@@ -40,7 +40,7 @@ def poses_to_images_text(directory):
         pose = pose[1:]
         rotation = Rot3(np.array(pose[3:]).reshape(3, 3))
         pose = Pose3(rotation, Point3(np.array(pose[0:3]))).inverse()
-        if count%20 == 0:
+        if count%1 == 0:
             poses.append(pose)
         count+=1
         
@@ -52,5 +52,5 @@ def poses_to_images_text(directory):
 
 
 # evaluation_directory = '/home/sma96/datasets/spring2020/raspi/kluas/localization/results/96_10fps_result'
-evaluation_directory = '/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_face_inside/debug'
+evaluation_directory = '/home/sma96/datasets/spring2020/raspi/kluas/localization/raspi_inner_137_640x480/debug'
 poses_to_images_text(evaluation_directory)

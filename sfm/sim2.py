@@ -5,6 +5,7 @@ import unittest
 import gtsam
 import numpy as np
 from gtsam import Point2, Pose2, Rot2
+from gtsam.utils.test_case import GtsamTestCase
 
 
 class Similarity2(object):
@@ -45,7 +46,7 @@ class Similarity2(object):
         This function is developed based on gtsam::Pose2::align() with modification to calculate the scale. 
         *************************************************************************
         It finds the angle using a linear method:
-        q = Pose2::transform_from(p) = t + R*p
+        q = Pose2::transformFrom(p) = t + R*p
         Subtract the centroid from each point
 
         q1 = R*p1+t     -> (q1-c_q) = R * (p1-c_p) 
@@ -67,7 +68,7 @@ class Similarity2(object):
         The hessian is diagonal and just divides by a constant.
         i.e., cos ~ sum(dpx*dqx + dpy*dqy) and sin ~ sum(-dpy*dqx + dpx*dqy)
 
-        The scale is the square root of the determinant of the rotation matrix because the rotation matrix is an orthogonal matrix.
+        The scale is the square root of the determinant of the rotation matrix because the rotation matrix is SO3.
 
         The translation is then found from the centroids
         as they also satisfy cq = t + sR*cp, hence t = cq - sR*cp
@@ -121,7 +122,7 @@ class Similarity2(object):
         self._s = scale
 
 
-class TestSimilarity2(unittest.TestCase):
+class TestSimilarity2(GtsamTestCase):
 
     def setUp(self):
         # Create poses for the source map
@@ -151,13 +152,6 @@ class TestSimilarity2(unittest.TestCase):
         # Create the destination map
         self.d_map = (d_poses, d_points)
 
-    def assert_gtsam_equals(self, actual, expected, tol=1e-6):
-        """Helper function that prints out actual and expected if not equal."""
-        equal = actual.equals(expected, tol)
-        if not equal:
-            raise self.failureException(
-                "Not equal:\n{}!={}".format(actual, expected))
-
     def test_transform(self):
         """Test similarity transform on poses and points."""
         expected_poses, expected_points = self.d_map
@@ -166,11 +160,11 @@ class TestSimilarity2(unittest.TestCase):
         poses, points = self.s_map
         for i, point in enumerate(points):
             point = sim2.point(point)
-            self.assert_gtsam_equals(expected_points[i], point)
+            self.gtsamAssertEquals(expected_points[i], point)
 
         for i, pose in enumerate(poses):
             pose = sim2.pose(pose)
-            self.assert_gtsam_equals(expected_poses[i], pose)
+            self.gtsamAssertEquals(expected_poses[i], pose)
 
     def test_align(self):
         """Test generating similarity transform with Point2 pairs."""
@@ -195,7 +189,7 @@ class TestSimilarity2(unittest.TestCase):
         # Check actual sim2 equals to expected sim2
         assert(expected_R.equals(sim2._R, 1e-6))
         self.assertEqual(sim2._s, expected_s)
-        self.assert_gtsam_equals(sim2._t, expected_t)
+        self.gtsamAssertEquals(sim2._t, expected_t)
 
     def test_align_case_1(self):
         """Test generating similarity transform with gtsam pose2 align test case 1 - translation only."""
@@ -219,7 +213,7 @@ class TestSimilarity2(unittest.TestCase):
 
         # Check actual sim2 equals to expected sim2
         assert(expected_R.equals(sim2._R, 1e-6))
-        self.assert_gtsam_equals(sim2._t, expected_t)
+        self.gtsamAssertEquals(sim2._t, expected_t)
         self.assertEqual(sim2._s, expected_s)
 
     def test_align_case_2(self):
@@ -236,10 +230,10 @@ class TestSimilarity2(unittest.TestCase):
         s_point2 = Point2(10, 0)
 
         # Create destination points
-        d_point1 = expected.transform_from(s_point1)
-        d_point2 = expected.transform_from(s_point2) 
-        self.assert_gtsam_equals(d_point1,Point2(20, 10))
-        self.assert_gtsam_equals(d_point2,Point2(20, 20))
+        d_point1 = expected.transformFrom(s_point1)
+        d_point2 = expected.transformFrom(s_point2) 
+        self.gtsamAssertEquals(d_point1,Point2(20, 10))
+        self.gtsamAssertEquals(d_point2,Point2(20, 20))
 
         # Align
         point_pairs = [[s_point1, d_point1], [s_point2, d_point2]]
@@ -248,7 +242,7 @@ class TestSimilarity2(unittest.TestCase):
 
         # Check actual sim2 equals to expected sim2
         assert(expected_R.equals(sim2._R, 1e-6))
-        self.assert_gtsam_equals(sim2._t, expected_t)
+        self.gtsamAssertEquals(sim2._t, expected_t)
         self.assertAlmostEqual(sim2._s, expected_s,delta = 1e-6)
 
     def test_align_case_3(self):
@@ -266,9 +260,9 @@ class TestSimilarity2(unittest.TestCase):
         s_point3 = Point2(10,10)
 
         # Create destination points
-        d_point1 = expected.transform_from(s_point1)
-        d_point2 = expected.transform_from(s_point2)
-        d_point3 = expected.transform_from(s_point3)
+        d_point1 = expected.transformFrom(s_point1)
+        d_point2 = expected.transformFrom(s_point2)
+        d_point3 = expected.transformFrom(s_point3)
 
         # Align
         point_pairs = [[s_point1, d_point1], [s_point2, d_point2], [s_point3, d_point3]]
@@ -277,7 +271,7 @@ class TestSimilarity2(unittest.TestCase):
 
         # Check actual sim2 equals to expected sim2
         assert(expected_R.equals(sim2._R, 1e-6))
-        self.assert_gtsam_equals(sim2._t, expected_t)
+        self.gtsamAssertEquals(sim2._t, expected_t)
         self.assertAlmostEqual(sim2._s, expected_s,delta = 1e-6)
 
 if __name__ == "__main__":
